@@ -28,7 +28,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -50,13 +49,13 @@ jobs:
           mkdir -p "$RUNNER_TEMP/kooyahq-cli-pack"
           npm pack --pack-destination "$RUNNER_TEMP/kooyahq-cli-pack"
 
-      - name: Install packed artifact globally
-        run: npm install --global "$RUNNER_TEMP"/kooyahq-cli-pack/kooyahq-cli-*.tgz
+      - name: Install packed artifact
+        run: npm install --prefix "$RUNNER_TEMP/kooyahq-cli-install" "$RUNNER_TEMP"/kooyahq-cli-pack/kooyahq-cli-*.tgz
 
       - name: Smoke-test installed command
         run: |
-          kooyahq --version
-          kooyahq --help
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --version
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --help
 
   required:
     name: Required checks
