@@ -18,9 +18,10 @@ Install from `main`:
 ```sh
 npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
+kooyahq --help
 ```
 
-The package builds during npm's `prepare` lifecycle. To update, rerun the same install command. To remove it:
+The GitHub package ships compiled `dist/` files on `main`; installation should not compile TypeScript on your machine. To update, rerun the same install command. To remove it:
 
 ```sh
 npm uninstall -g kooyahq-cli
@@ -37,6 +38,7 @@ ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
+kooyahq --help
 ```
 
 Configuration is stored at `%USERPROFILE%\.kooyahq\config.json`. On Windows, the CLI applies private ACLs with `whoami` and `icacls` without invoking a shell; only the current account and `SYSTEM` are granted access.
@@ -50,6 +52,7 @@ ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
+kooyahq --help
 ```
 
 Configuration is stored at `~/.kooyahq/config.json`. The directory is set to `0700`, the config file is set to `0600`, and writes use a temporary file in the same directory followed by an atomic rename.
@@ -265,5 +268,28 @@ Access keys are scoped by the server. The CLI does not elevate access: authentic
 - Exit `3`: the key is missing, expired, revoked, or copied incorrectly. Reissue it; do not paste it into diagnostics.
 - Exit `4`: the authenticated key lacks the required permission. Ask a KooyaHQ administrator to review its scope.
 - SSH install failure: verify repository membership, SSH-agent state, and `ssh -T git@github.com`.
+- `tsc: not found` during `npm install -g git+ssh://...`: update to the latest `main` and reinstall. Current GitHub installs use committed `dist/` files and do not require TypeScript on the target machine.
+- `ENOTDIR: not a directory, rename .../node_modules/kooyahq-cli`: remove the stale global install path, clear the npm Git cache entry, and reinstall. On macOS/Linux with nvm:
+
+  ```sh
+  npm uninstall -g kooyahq-cli || true
+  node -p "require('node:path').join(process.execPath, '..', '..', 'lib', 'node_modules', 'kooyahq-cli')"
+  rm -f "$(node -p "require('node:path').join(process.execPath, '..', '..', 'lib', 'node_modules', 'kooyahq-cli')")"
+  npm cache verify
+  npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+  kooyahq --version
+  ```
+
+  In Windows PowerShell:
+
+  ```powershell
+  npm uninstall -g kooyahq-cli
+  $globalModules = npm root -g
+  Remove-Item -Force "$globalModules\kooyahq-cli" -ErrorAction SilentlyContinue
+  Remove-Item -Recurse -Force "$globalModules\.kooyahq-cli-*" -ErrorAction SilentlyContinue
+  npm cache verify
+  npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+  kooyahq --version
+  ```
 - TLS/network failure: check the configured origin and corporate proxy/firewall. Redirects are intentionally rejected.
 - Timer ambiguity: rerun `time timers list --output json`, then supply the intended timer ID explicitly.

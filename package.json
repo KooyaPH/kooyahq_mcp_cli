@@ -23,8 +23,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node scripts/run-tests.mjs",
-    "prepare": "npm run build"
+    "test": "node scripts/run-tests.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
