@@ -16,12 +16,12 @@ git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 Install from `main`:
 
 ```sh
-npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
 ```
 
-The GitHub package ships compiled `dist/` files on `main`; installation should not compile TypeScript on your machine. To update, rerun the same install command. To remove it:
+`--install-links=true` is required for private GitHub installs. Without it, npm can leave `kooyahq-cli` as a dangling symlink into its temporary Git cache on some npm versions. The GitHub package ships compiled `dist/` files on `main`. During installation npm runs a dependency-free package check against those committed files; it does not compile TypeScript on your machine. To update, rerun the same install command. To remove it:
 
 ```sh
 npm uninstall -g kooyahq-cli
@@ -36,7 +36,7 @@ Use PowerShell, Git for Windows, and Node.js 18 or newer:
 ```powershell
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
 ```
@@ -50,7 +50,7 @@ Use a POSIX shell, Git, OpenSSH, and Node.js 18 or newer:
 ```sh
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
 ```
@@ -269,14 +269,22 @@ Access keys are scoped by the server. The CLI does not elevate access: authentic
 - Exit `4`: the authenticated key lacks the required permission. Ask a KooyaHQ administrator to review its scope.
 - SSH install failure: verify repository membership, SSH-agent state, and `ssh -T git@github.com`.
 - `tsc: not found` during `npm install -g git+ssh://...`: update to the latest `main` and reinstall. Current GitHub installs use committed `dist/` files and do not require TypeScript on the target machine.
-- `ENOTDIR: not a directory, rename .../node_modules/kooyahq-cli`: remove the stale global install path, clear the npm Git cache entry, and reinstall. On macOS/Linux with nvm:
+- `TAR_ENTRY_ERROR ENOENT .../dist/...` followed by `kooyahq: command not found`, or `ENOTDIR: not a directory, rename .../node_modules/kooyahq-cli`: remove stale global symlinks, clear npm's cache index, and reinstall. On macOS/Linux with nvm:
 
   ```sh
   npm uninstall -g kooyahq-cli || true
-  node -p "require('node:path').join(process.execPath, '..', '..', 'lib', 'node_modules', 'kooyahq-cli')"
-  rm -f "$(node -p "require('node:path').join(process.execPath, '..', '..', 'lib', 'node_modules', 'kooyahq-cli')")"
+  global_prefix="$(npm prefix -g)"
+  package_path="$global_prefix/lib/node_modules/kooyahq-cli"
+  bin_path="$global_prefix/bin/kooyahq"
+  test -L "$bin_path" && unlink "$bin_path"
+  test -L "$package_path" && unlink "$package_path"
+  if [ -e "$package_path" ]; then
+    echo "Refusing to remove non-symlink package path: $package_path"
+    exit 1
+  fi
   npm cache verify
-  npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+  npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+  hash -r
   kooyahq --version
   ```
 
@@ -284,11 +292,19 @@ Access keys are scoped by the server. The CLI does not elevate access: authentic
 
   ```powershell
   npm uninstall -g kooyahq-cli
+  $globalPrefix = npm prefix -g
   $globalModules = npm root -g
-  Remove-Item -Force "$globalModules\kooyahq-cli" -ErrorAction SilentlyContinue
-  Remove-Item -Recurse -Force "$globalModules\.kooyahq-cli-*" -ErrorAction SilentlyContinue
+  $packagePath = Join-Path $globalModules 'kooyahq-cli'
+  $binPath = Join-Path $globalPrefix 'kooyahq.cmd'
+  Remove-Item -Force $binPath -ErrorAction SilentlyContinue
+  if ((Test-Path $packagePath) -and ((Get-Item $packagePath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    Remove-Item -Force $packagePath
+  }
+  if (Test-Path $packagePath) {
+    throw "Refusing to remove non-symlink package path: $packagePath"
+  }
   npm cache verify
-  npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+  npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
   kooyahq --version
   ```
 - TLS/network failure: check the configured origin and corporate proxy/firewall. Redirects are intentionally rejected.
