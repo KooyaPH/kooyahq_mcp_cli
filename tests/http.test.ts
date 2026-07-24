@@ -69,6 +69,54 @@ test('redacts credentials reflected by an API error', async () => {
   );
 });
 
+test('times out requests with AbortController before surfacing a network error', async () => {
+  let capturedSignal: AbortSignal | undefined;
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0', timeoutMs: 1,
+    fetch: async (_input, init) => {
+      capturedSignal = init?.signal ?? undefined;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+
+  await assert.rejects(client.request('GET', '/whoami'), /Unable to reach/);
+  assert.equal(capturedSignal?.aborted, true);
+});
+
+test('rejects oversized responses before parsing JSON', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0', maxResponseBytes: 10,
+    fetch: async () => new Response(JSON.stringify({ data: 'too large' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
+  });
+
+  await assert.rejects(client.request('GET', '/projects'), /too large/);
+});
+
+test('extracts nested API error messages safely', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'visible-id', secretAccessKey: 'hidden-secret',
+    version: '1.0.0',
+    fetch: async () => new Response(JSON.stringify({
+      error: { message: 'Permission denied for visible-id using hidden-secret' },
+    }), { status: 403, headers: { 'content-type': 'application/json' } }),
+  });
+
+  await assert.rejects(
+    client.request('GET', '/users'),
+    (error: Error) => {
+      assert.match(error.message, /Permission denied/);
+      assert.doesNotMatch(error.message, /visible-id|hidden-secret/);
+      return true;
+    },
+  );
+});
+
 test('rejects an unsafe base URL before calling fetch', async () => {
   let calls = 0;
   assert.throws(() => new ApiClient({

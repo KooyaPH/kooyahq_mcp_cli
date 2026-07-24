@@ -1,9 +1,14 @@
 import type { OptionSpec } from './types.js';
 
+const sortableFields = [
+  'createdAt', 'updatedAt', 'name', 'title', 'email', 'status', 'priority',
+  'duration', 'startTime', 'endTime', 'occurredAt',
+];
+
 export const listOptions: Record<string, OptionSpec> = {
   page: { apiName: 'page', type: 'integer' },
   limit: { apiName: 'limit', type: 'integer' },
-  sort: { apiName: 'sortBy' },
+  sort: { apiName: 'sortBy', choices: sortableFields },
   order: { apiName: 'sortOrder' },
 };
 

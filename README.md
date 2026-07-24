@@ -2,31 +2,57 @@
 
 Private command-line access to the KooyaHQ API for authenticated KooyaHQ operators. The CLI targets `https://hq-be.kooyaai.com/api/cli/v1` by default and requires Node.js 18 or newer.
 
-This package is private and is not published to npmjs.com. Releases are installed from authenticated GitHub tags.
+This package is private and is not published to npmjs.com. Install it from the private GitHub repository. There is no npm package publication and no release-tag requirement for internal installs.
 
 ## Install from GitHub
 
-You need read access to `KooyaPH/kooyahq_cli` and an SSH key accepted by GitHub. Confirm access before installing:
+You need read access to `KooyaPH/kooyahq_cli`, Node.js 18 or newer, npm, Git, and a GitHub-authenticated SSH key. Confirm access before installing:
 
 ```sh
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 ```
 
-Install a reviewed release tag (replace `<tag>` with an actual tag such as `v0.1.0`):
+Install from `main`:
 
 ```sh
-npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#<tag>
+npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 ```
 
-The package builds during npm's `prepare` lifecycle, so a compiler is not required globally. To update, install the newer reviewed tag with the same command. To remove it:
+The package builds during npm's `prepare` lifecycle. To update, rerun the same install command. To remove it:
 
 ```sh
 npm uninstall -g kooyahq-cli
 ```
 
 There is deliberately no npm publication or deployment workflow.
+
+### Windows
+
+Use PowerShell, Git for Windows, and Node.js 18 or newer:
+
+```powershell
+ssh -T git@github.com
+git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
+npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+kooyahq --version
+```
+
+Configuration is stored at `%USERPROFILE%\.kooyahq\config.json`. On Windows, the CLI applies private ACLs with `whoami` and `icacls` without invoking a shell; only the current account and `SYSTEM` are granted access.
+
+### macOS and Linux
+
+Use a POSIX shell, Git, OpenSSH, and Node.js 18 or newer:
+
+```sh
+ssh -T git@github.com
+git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
+npm install -g git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+kooyahq --version
+```
+
+Configuration is stored at `~/.kooyahq/config.json`. The directory is set to `0700`, the config file is set to `0600`, and writes use a temporary file in the same directory followed by an atomic rename.
 
 ## Configure
 
@@ -43,7 +69,7 @@ kooyahq configure clear
 - POSIX: `~/.kooyahq/config.json`
 - Windows: `%USERPROFILE%\.kooyahq\config.json`
 
-On POSIX, the directory and file are created with modes `0700` and `0600`. Writes use a temporary file in the same directory followed by an atomic rename.
+On POSIX, the directory and file are created with modes `0700` and `0600`. On Windows, inheritance is removed and access is restricted to the current account plus `SYSTEM`. Writes use a temporary file in the same directory followed by an atomic rename.
 
 For non-interactive use, all three variables must be set together. They override the stored configuration as one complete set:
 
@@ -72,7 +98,7 @@ projects update <id>
 projects delete <id> [--yes]
 ```
 
-Project data options: `--name`, `--emoji`, `--icon-url`.
+Project create requires `--name`. Project update requires at least one data option. Project data options: `--name`, `--emoji`, `--icon-url`.
 
 ### Boards
 
@@ -140,7 +166,7 @@ analytics projects
 analytics costs
 ```
 
-Analytics filters: `--start-date` and `--end-date`.
+Analytics requires both `--start-date` and `--end-date`.
 
 ### Users
 
@@ -208,7 +234,7 @@ kooyahq boards members update-role board_123 user_456 --role admin --output json
 kooyahq users permissions update user_456 --permissions projects:view,board:update
 ```
 
-Options are converted with `URLSearchParams`; CLI `--sort` and `--order` map to API `sortBy` and `sortOrder`. Unknown filters are rejected instead of being sent to the API. JSON flags must parse to the documented object or array shape. Table output is the default. JSON output preserves the API response for scripting.
+Options are converted with `URLSearchParams`; CLI `--sort` and `--order` map to API `sortBy` and `sortOrder`. Sort fields are allowlisted to common server fields: `createdAt`, `updatedAt`, `name`, `title`, `email`, `status`, `priority`, `duration`, `startTime`, `endTime`, and `occurredAt`. Unknown filters or unsupported sort fields are rejected instead of being sent to the API. JSON flags must parse to the documented object or array shape. Table output is the default. JSON output preserves the API response for scripting. Empty successful mutation responses print `Success.` in table mode.
 
 ## Permissions and exit codes
 
@@ -227,6 +253,7 @@ Access keys are scoped by the server. The CLI does not elevate access: authentic
 
 - Requests use `Authorization: KooyaKey <id>:<secret>` only over the validated origin and API root.
 - Redirect following is disabled, which prevents credentials crossing to another origin.
+- Requests have a 30-second timeout and responses are capped at 10 MiB before JSON parsing.
 - The CLI never logs credentials and redacts credentials if an API error reflects them.
 - Do not place secrets in shell history, tickets, chat, screenshots, or repository files. Prefer the hidden prompt or a protected CI secret store.
 - To revoke access, revoke/rotate the access key in KooyaHQ, run `kooyahq configure clear`, and remove any environment or CI secret values. Clearing the local file alone does not revoke a server-side key.

@@ -6,7 +6,7 @@ import test from 'node:test';
 
 import { resolveCredentialsFromEnv } from '../src/config/env.js';
 import { configPathFor } from '../src/config/paths.js';
-import { readConfig, writeConfig } from '../src/config/store.js';
+import { readConfig, windowsPrivateAclCommands, writeConfig } from '../src/config/store.js';
 import { DEFAULT_BASE_URL, validateBaseUrl } from '../src/config/url.js';
 import { ValidationError } from '../src/core/errors.js';
 
@@ -87,4 +87,11 @@ test('repairs an existing POSIX config directory to private permissions', async 
     baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
   }, 'linux');
   assert.equal((await stat(directory)).mode & 0o777, 0o700);
+});
+
+test('builds shell-free Windows ACL commands for the owner and SYSTEM only', () => {
+  assert.deepEqual(windowsPrivateAclCommands('C:\\Users\\Sam\\.kooyahq', 'C:\\Users\\Sam\\.kooyahq\\config.json', 'DESKTOP\\Sam'), [
+    ['C:\\Users\\Sam\\.kooyahq', '/inheritance:r', '/grant:r', 'DESKTOP\\Sam:(OI)(CI)F', 'SYSTEM:(OI)(CI)F'],
+    ['C:\\Users\\Sam\\.kooyahq\\config.json', '/inheritance:r', '/grant:r', 'DESKTOP\\Sam:F', 'SYSTEM:F'],
+  ]);
 });

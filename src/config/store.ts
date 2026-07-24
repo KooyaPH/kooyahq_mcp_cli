@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { ConfigError, ValidationError } from '../core/errors.js';
 import type { Credentials } from './types.js';
 import { validateBaseUrl } from './url.js';
+
+const execFileAsync = promisify(execFile);
 
 function validateStoredConfig(value: unknown): Credentials {
   if (!value || typeof value !== 'object') {
@@ -67,10 +71,31 @@ export async function writeConfig(
     await handle.close();
     handle = undefined;
     await rename(temporaryPath, path);
+    if (platform === 'win32') await applyWindowsPrivateAcl(directory, path);
   } catch {
     if (handle) await handle.close().catch(() => undefined);
     await rm(temporaryPath, { force: true }).catch(() => undefined);
     throw new ConfigError('Unable to save the KooyaHQ configuration file.');
+  }
+}
+
+export function windowsPrivateAclCommands(
+  directory: string,
+  path: string,
+  account: string,
+): string[][] {
+  return [
+    [directory, '/inheritance:r', '/grant:r', `${account}:(OI)(CI)F`, 'SYSTEM:(OI)(CI)F'],
+    [path, '/inheritance:r', '/grant:r', `${account}:F`, 'SYSTEM:F'],
+  ];
+}
+
+async function applyWindowsPrivateAcl(directory: string, path: string): Promise<void> {
+  const { stdout } = await execFileAsync('whoami', []);
+  const account = stdout.trim();
+  if (!account) throw new Error('whoami returned no account');
+  for (const args of windowsPrivateAclCommands(directory, path, account)) {
+    await execFileAsync('icacls', args);
   }
 }
 

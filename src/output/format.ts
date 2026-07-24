@@ -2,6 +2,7 @@ import type { OutputFormat } from '../commands/types.js';
 
 export function formatOutput(value: unknown, format: OutputFormat): string {
   if (format === 'json') return JSON.stringify(value ?? null, null, 2);
+  if (value === undefined) return 'Success.';
   const rows = extractRows(value);
   if (rows.length === 0) return 'No results.';
   const records = rows.map(toRecord);

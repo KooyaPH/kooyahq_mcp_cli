@@ -71,6 +71,10 @@ test('allowlists and URL-encodes list filters, sort, and pagination', () => {
     () => buildRequest(commandCatalog, ['tickets', 'list', '--secret-access-key', 'leak']),
     /Unknown option/,
   );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['projects', 'list', '--sort', 'secretAccessKey']),
+    /--sort must be/,
+  );
 });
 
 test('maps backend-specific whoami, timer, ticket, comment, and analytics contracts', () => {
@@ -102,6 +106,10 @@ test('maps backend-specific whoami, timer, ticket, comment, and analytics contra
     method: 'GET', path: '/analytics/time',
     query: { startDate: '2026-07-01', endDate: '2026-07-31' }, output: 'table',
   });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['analytics', 'team', '--start-date', '2026-07-01']),
+    /requires --end-date/,
+  );
 });
 
 test('maps only live KooyaHQ project fields', () => {
@@ -114,6 +122,10 @@ test('maps only live KooyaHQ project fields', () => {
   assert.throws(
     () => buildRequest(commandCatalog, ['projects', 'update', 'project-1', '--status', 'active']),
     /Unknown option --status/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['projects', 'create', '--emoji', '🚀']),
+    /requires --name/,
   );
 });
 

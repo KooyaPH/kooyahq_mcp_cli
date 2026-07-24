@@ -9,4 +9,5 @@ export const analyticsCommands: CommandSpec[] = ['time', 'team', 'projects', 'co
   method: 'GET',
   path: `/analytics/${name}`,
   query: analyticsQuery,
+  requiredOptions: ['start-date', 'end-date'],
 }));

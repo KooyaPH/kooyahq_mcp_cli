@@ -155,3 +155,19 @@ test('required create options fail before network traffic', async () => {
   assert.equal(code, 2);
   assert.equal(calls, 0);
 });
+
+test('prints a success message for empty successful mutation responses', async () => {
+  const lines: string[] = [];
+  const code = await runCli(['projects', 'delete', 'project-1', '--yes'], dependencies({
+    environment: {
+      KOOYAHQ_BASE_URL: 'https://example.com',
+      KOOYAHQ_ACCESS_KEY_ID: 'id',
+      KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+    },
+    fetch: async () => new Response(null, { status: 204 }),
+    output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+  }));
+
+  assert.equal(code, 0);
+  assert.deepEqual(lines, ['Success.']);
+});
