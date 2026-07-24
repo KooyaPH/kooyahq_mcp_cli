@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Linux / Node ${{ matrix.node }}
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+      - name: Pack installable artifact
+        run: |
+          mkdir -p "$RUNNER_TEMP/kooyahq-cli-pack"
+          npm pack --pack-destination "$RUNNER_TEMP/kooyahq-cli-pack"
+
+      - name: Install packed artifact
+        run: npm install --prefix "$RUNNER_TEMP/kooyahq-cli-install" "$RUNNER_TEMP"/kooyahq-cli-pack/kooyahq-cli-*.tgz
+
+      - name: Smoke-test installed command
+        run: |
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --version
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --help
+
+  required:
+    name: Required checks
+    runs-on: [self-hosted, Linux]
+    needs: verify
+    if: ${{ always() }}
+    steps:
+      - name: Verify matrix result
+        run: |
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "Node matrix failed: ${{ needs.verify.result }}"
+            exit 1
+          fi
+          echo "Node matrix passed."
