@@ -269,7 +269,7 @@ Access keys are scoped by the server. The CLI does not elevate access: authentic
 - Exit `4`: the authenticated key lacks the required permission. Ask a KooyaHQ administrator to review its scope.
 - SSH install failure: verify repository membership, SSH-agent state, and `ssh -T git@github.com`.
 - `tsc: not found` during `npm install -g git+ssh://...`: update to the latest `main` and reinstall. Current GitHub installs use committed `dist/` files and do not require TypeScript on the target machine.
-- `TAR_ENTRY_ERROR ENOENT .../dist/...` followed by `kooyahq: command not found`, or `ENOTDIR: not a directory, rename .../node_modules/kooyahq-cli`: remove stale global symlinks, clear npm's cache index, and reinstall. On macOS/Linux with nvm:
+- `TAR_ENTRY_ERROR ENOENT .../dist/...` followed by `kooyahq: command not found`, `ENOTDIR: not a directory, rename .../node_modules/kooyahq-cli`, or `ENOTEMPTY: directory not empty, rename .../node_modules/kooyahq-cli`: remove stale global symlinks, clear npm's cache index, and reinstall. On macOS/Linux with nvm:
 
   ```sh
   npm uninstall -g kooyahq-cli || true

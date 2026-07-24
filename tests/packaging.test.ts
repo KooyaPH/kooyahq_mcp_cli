@@ -25,6 +25,7 @@ test('README documents global GitHub install cleanup and configuration steps', (
   assert.match(readme, /unlink "\$bin_path"/);
   assert.match(readme, /unlink "\$package_path"/);
   assert.match(readme, /hash -r/);
+  assert.match(readme, /ENOTEMPTY/);
   assert.match(readme, /ENOTDIR/);
   assert.match(readme, /tsc: not found/);
   assert.match(readme, /kooyahq auth whoami/);
