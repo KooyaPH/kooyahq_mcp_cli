@@ -88,18 +88,20 @@ Help and skill discovery run before configuration and never send network traffic
 
 ```sh
 kooyahq --help
+kooyahq configure --help
 kooyahq tickets --help
 kooyahq tickets create --help
 
 kooyahq --skill
+kooyahq --skill configure
 kooyahq --skill tickets
 kooyahq --skill tickets create
 kooyahq --skill tickets create --output json
 ```
 
-Command help includes the workflow, exact flags, enum values, required groups, conditional parameters, compatibility aliases, shell-safe examples, response notes, and security behavior. `--skill ... --output json` emits schema version 2: a stable, machine-readable command contract with parameter descriptions, truthful exactly-one groups, import schemas, and response metadata for automation and AI tools.
+Command help includes the workflow, exact flags, enum values, required and at-least-one groups, mutually exclusive options, conditional parameters, scalar and collection limits, cross-field ordering rules, compatibility aliases, shell-safe examples, response notes, and security behavior. `--skill ... --output json` emits schema version 2: a stable, machine-readable command contract with those constraints, import schemas, and response metadata for automation and AI tools. Configuration discovery is also offline; it never reveals stored credentials.
 
-Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Board and ticket ID selectors and ticket-ID anchors require a 24-character hexadecimal ObjectId; keys use the documented `OPS` or `OPS-42` forms. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
+Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Mongo-backed selectors require a 24-character lowercase hexadecimal ObjectId; keys use the documented `OPS` or `OPS-42` forms. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
 
 ## Command catalog
 
@@ -120,6 +122,8 @@ projects keyword-migration apply
 ```
 
 Keyword migration reassigns time entries using the same keyword workflow as Project Management. Preview first; apply requires confirmation unless `--yes` is supplied.
+
+Project names are limited to 100 characters, emoji to 32 characters, and icon URLs to 2,048 characters. Use `projects update --clear-emoji --clear-icon-url` to intentionally remove optional presentation values.
 
 ### Boards
 
@@ -159,9 +163,11 @@ boards automation update
 boards automation remove
 ```
 
-Boards can be selected by exact ID or key. Member, column, settings, favorite, and GitHub automation mutations require the same board access as the web application. Column moves use semantic `before`, `after`, `first`, or `last` placement. Removing an occupied column requires an explicit destination and is refused if the backend cannot guarantee an atomic migration.
+Boards can be selected by exact ID or key. Activities, mention candidates, and assignee candidates are paginated and support search and allowlisted sorting. Member, column, settings, favorite, and GitHub automation mutations require the same board access as the web application. Column moves use semantic `before`, `after`, `first`, or `last` placement. Removing an occupied column requires an explicit destination and is refused if the backend cannot guarantee an atomic migration.
 
-`boards favorite get` is represented by `boards get` and the favorite field in its response; the mutation commands are listed separately above.
+Use explicit clear flags for nullable or resettable board values: `boards settings update --clear-description`, `boards columns update --clear-color --clear-wip-limit`, and `boards automation update --clear-target-branch --clear-description`. Field updates require at least one of `--visible` or `--order`. Creating an automation rule requires `--enabled`, `--status`, and `--column-id` so an automation client cannot depend on hidden frontend defaults.
+
+`boards get` includes the current favorite state. `boards favorite` is the compatibility alias for `boards favorite toggle`; the backend records the canonical toggle command in CLI access audits.
 
 ### Tickets, comments, and board work
 
@@ -216,9 +222,11 @@ tickets development set
 tickets development clear
 ```
 
-Ticket IDs and keys are exact selectors. Board-scoped list/create/import commands require exactly one board ID or board key. Ticket mutations cover the web application's lifecycle, comments, assignments, relationships, blockers, hierarchy, acceptance criteria, documents, and GitHub development data.
+Ticket IDs and keys are exact selectors. Board-scoped list/create/import commands require exactly one board ID or board key. Ticket mutations cover the web application's lifecycle, comments, assignments, relationships, blockers, hierarchy, acceptance criteria, documents, and GitHub development data. Paginated comment, assigned-ticket, activity, viewer, and subtask reads support `--search` in addition to their documented filters and sorting.
 
 Ticket creation accepts mutually exclusive `--parent-ticket-id|--parent-ticket-key` and `--root-epic-id|--root-epic-key` selectors. A subtask requires exactly one of `--parent-ticket-id|--parent-ticket-key`; other ticket types may omit a parent. Move anchors accept exact ID or key variants for `before` and `after`, plus `--first` or `--last`.
+
+Descriptions and structured comment content use the canonical rich-text object `{"type":"html","content":"<p>Ready to ship</p>"}`. The CLI validates that exact shape, rejects extra properties, and limits content to 100,000 characters before any request is sent. Plain `--content` remains available for comment text.
 
 `tickets improve` and `tickets improve-draft` return preview suggestions only and never apply fields automatically. Draft improvement requires `--title` and accepts flattened `--description-json`, `--acceptance-criteria-json`, `--ticket-type`, and `--user-command` fields. User guidance is limited to 2,000 characters. Development updates accept `--branch`, which is sent using the backend `branchName` contract.
 
@@ -228,8 +236,10 @@ Ticket imports accept JSON or CSV from a file or standard input, never both:
 
 ```sh
 kooyahq tickets import preview --board-key OPS --file tickets.csv
-kooyahq tickets import apply --board-key OPS --stdin --format json
+kooyahq tickets import apply --board-key OPS --operation-id 123e4567-e89b-42d3-a456-426614174000 --stdin --format json
 ```
+
+Apply requires a canonical lowercase UUID in `--operation-id`. If the result is lost, retry the exact same import with the same operation ID; the backend returns the original result without duplicating writes. Reusing an operation ID with different normalized rows or board scope returns a conflict. Preview does not require an operation ID.
 
 Input must be UTF-8 and is limited to 5 MiB and 250 tickets. JSON input is an array of row objects. Supported row fields are `importRef`, `title`, `ticketType`, `status`, `priority`, `reporterEmail`, `assigneeEmail`, `points`, `tags`, `parentRef`, `rootEpicRef`, `startDate`, `endDate`, `dueDate`, `description`, `acceptanceCriteria`, `documents`, `comments`, `relatedRefs`, and `github`.
 
@@ -259,7 +269,9 @@ time workday summary
 time workday end
 ```
 
-Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. `start-many` accepts at most 20 unique projects. Team entry reads require `--scope team`, and `--user-id` is rejected without that explicit scope. Entry list dates use strict `YYYY-MM-DD` values and a maximum 366-day ordered range. Entry timestamps must be zoned ISO 8601 values and are checked for ordering when both are present. The backend still checks the user's time-entry permission.
+Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. `start-many` accepts at most 20 case-insensitively unique projects, with each project limited to 100 characters, and is all-or-nothing: the backend either starts the complete eligible batch or starts none. Timer and entry task text is limited to 1,000 characters; explicit durations are limited to 1,000,000 seconds. Timer, entry, and today's-entry lists support `--search`.
+
+Team entry reads require `--scope team`, and `--user-id` is rejected without that explicit scope. Entry list dates use strict `YYYY-MM-DD` values and span at most 366 inclusive calendar dates. Entry timestamps must be zoned ISO 8601 values and are checked for ordering when both are present. The backend still checks the user's time-entry permission.
 
 ### Analytics and budgets
 
@@ -280,7 +292,9 @@ analytics costs budgets delete
 analytics costs budgets comparisons
 ```
 
-Time, team, project, and cost summaries require explicit calendar dates and reject ranges longer than 366 days. Cost analytics and budget writes require their corresponding backend permissions. The CLI does not expose privileged salary/rate fields unless the backend route and acting user explicitly authorize them.
+Time, team, and project summaries require exact `YYYY-MM-DD` start and end dates and span at most 366 inclusive calendar dates. `analytics time` also accepts an optional exact `--user-id` for authorized user-level analysis. Cost summary dates are optional, but supplying either boundary requires both; supplied ranges use the same 366-day maximum. Cost project, budget, and budget-comparison lists support `--search`.
+
+Budget start dates must be strictly earlier than end dates. Currency values are exactly three ASCII letters, and alert thresholds are percentages from 0 through 100 with `warning` no greater than `critical`. Use `analytics costs budgets update --clear-project` to remove a budget's project scope. Current cost analytics and budget routes require the backend `system:fullAccess` permission because per-person cost and time pairs can reveal compensation rates. The CLI never widens that authorization boundary.
 
 ### Users and administrator views
 
@@ -300,7 +314,9 @@ users templates list
 users templates get
 ```
 
-`users list --all --output json` is the assignment-friendly user lookup. Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Discover the current assignable permission templates with `kooyahq users templates list --output json`; the CLI rejects unknown permission names locally, while the backend still decides which catalog entries the acting user may assign. Preview permission changes with `--dry-run`. Use `users export --format csv --output raw` for a CSV stream. User create/update supports `--whatsapp-phone`; update supports `--clear-whatsapp-phone`. Use `--clear-permissions` to intentionally send an empty permission array instead of passing an ambiguous blank CSV value.
+`users list --all --output json` is the assignment-friendly user lookup. It supports `--search`, `--include-disabled`, `--position`, `--status`, `--created-from`, and `--created-to`; `--status` filters the stored profile status (`online|busy|away|offline`), not transient socket presence. Created-date boundaries may be used independently, or together for an ordered range of at most 366 inclusive calendar dates.
+
+Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Activity actions are allowlisted and shown by `kooyahq users activity list --help`; search can match an actor name or email. Discover the current assignable permission templates with `kooyahq users templates list --output json`; the CLI rejects unknown or duplicate permission names locally, while the backend still decides which catalog entries the acting user may assign. Preview permission changes with `--dry-run`. Use `users export --format csv --output raw` for a CSV stream. User create/update supports `--whatsapp-phone`; update supports `--clear-whatsapp-phone`, `--clear-position`, `--clear-birthday`, and `--clear-bio`. Use `--clear-permissions` to intentionally send an empty permission array instead of passing an ambiguous blank CSV value.
 
 ### Notifications
 
@@ -340,7 +356,9 @@ Examples:
 
 ```sh
 kooyahq boards get --board-key OPS --output json
+kooyahq boards activities list --board-key OPS --search "status" --sort createdAt --order desc --all --output json
 kooyahq boards members add --board-key OPS --user-id 507f1f77bcf86cd799439011 --role member --dry-run
+kooyahq boards columns update --board-key OPS --column-id done --clear-color --clear-wip-limit --dry-run
 kooyahq tickets list --board-key OPS --assignee-id 507f1f77bcf86cd799439011 --sort createdAt --order desc --all --output json
 kooyahq tickets create --board-key OPS --ticket-type task --title "Release" --assignee-id 507f1f77bcf86cd799439011 --dry-run
 kooyahq tickets create --board-key OPS --ticket-type subtask --title "Release test" --parent-ticket-key OPS-42 --root-epic-key OPS-1 --dry-run
@@ -351,10 +369,12 @@ kooyahq tickets blockers list --ticket-key OPS-42 --direction blocked-by --outpu
 kooyahq tickets blockers add --ticket-key OPS-42 --blocker-ticket-key OPS-12
 kooyahq time timers start-many --projects Project-A,Project-B --task "Review"
 kooyahq time entries list --scope team --user-id 507f1f77bcf86cd799439011 --start-date 2026-07-01 --end-date 2026-07-25 --output json
+kooyahq analytics time --user-id 507f1f77bcf86cd799439011 --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq analytics team --start-date 2026-07-01 --end-date 2026-07-25 --output json
+kooyahq analytics costs --output json
 kooyahq notifications list --unread-only true --all --output json
 kooyahq users list --search "Alex" --all --output json
-kooyahq users update --user-id 507f1f77bcf86cd799439011 --clear-whatsapp-phone --clear-permissions --dry-run
+kooyahq users update --user-id 507f1f77bcf86cd799439011 --clear-position --clear-birthday --clear-bio --clear-whatsapp-phone --clear-permissions --dry-run
 ```
 
 ## Authorization, auditing, and security

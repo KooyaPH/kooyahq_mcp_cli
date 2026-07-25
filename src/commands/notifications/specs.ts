@@ -10,7 +10,7 @@ export const notificationCommands: CommandSpec[] = [
     name: 'notifications mark-read',
     method: 'PATCH',
     path: '/notifications/:notificationId/read',
-    pathParams: { 'notification-id': { apiName: 'notificationId' } },
+    pathParams: { 'notification-id': { apiName: 'notificationId', format: 'object-id' } },
     requiredOptions: ['notification-id'],
   },
   { name: 'notifications mark-all-read', method: 'PATCH', path: '/notifications/read-all' },

@@ -52,6 +52,62 @@ test('JSON command skills describe every parameter and model exactly-one groups 
   assert.equal(ticketImport.input?.maxItems, 250);
   assert.ok(ticketImport.input?.rowFields.some((field) => field.name === 'title' && field.type === 'string'));
   assert.ok(ticketImport.input?.csvHeaders.includes('acceptanceCriteriaJson'));
+
+  const ticketImportApply = JSON.parse(
+    skillOutput(['tickets', 'import', 'apply', '--output', 'json']),
+  ) as {
+    examples: string[];
+    parameters: Array<{ name: string; required: boolean; format?: string; description?: string }>;
+  };
+  const operationId = ticketImportApply.parameters.find(
+    (parameter) => parameter.name === 'operation-id',
+  );
+  assert.equal(operationId?.required, true);
+  assert.equal(operationId?.format, 'uuid');
+  assert.match(operationId?.description ?? '', /exact same payload/);
+  assert.ok(ticketImportApply.examples.every(
+    (example) => example.includes('--operation-id 123e4567-e89b-42d3-a456-426614174000'),
+  ));
+});
+
+test('help and JSON skills expose body and at-least-one constraints', () => {
+  const update = JSON.parse(
+    skillOutput(['boards', 'update', '--output', 'json']),
+  ) as { requiresAtLeastOneBodyOption?: boolean };
+  assert.equal(update.requiresAtLeastOneBodyOption, true);
+  assert.match(helpText(['boards', 'update']), /At least one data option is required/i);
+
+  const field = JSON.parse(
+    skillOutput(['boards', 'settings', 'fields', 'set', '--output', 'json']),
+  ) as { atLeastOne?: string[][] };
+  assert.deepEqual(field.atLeastOne, [['visible', 'order']]);
+  assert.match(
+    helpText(['boards', 'settings', 'fields', 'set']),
+    /At least one: --visible, --order/i,
+  );
+});
+
+test('JSON skills expose backend-aligned scalar, collection, and cross-field constraints', () => {
+  const timers = JSON.parse(
+    skillOutput(['time', 'timers', 'start-many', '--output', 'json']),
+  ) as { parameters: Array<Record<string, unknown>> };
+  assert.equal(
+    timers.parameters.find((parameter) => parameter.name === 'projects')?.caseInsensitiveUniqueItems,
+    true,
+  );
+
+  const budget = JSON.parse(
+    skillOutput(['analytics', 'costs', 'budgets', 'update', '--output', 'json']),
+  ) as {
+    dateRanges: Array<{ requireDistinctDates?: boolean }>;
+    parameters: Array<{ name: string; pattern?: string; jsonNumericOrder?: unknown }>;
+  };
+  assert.equal(budget.dateRanges[0]?.requireDistinctDates, true);
+  assert.equal(budget.parameters.find((parameter) => parameter.name === 'currency')?.pattern, '^[A-Za-z]{3}$');
+  assert.deepEqual(
+    budget.parameters.find((parameter) => parameter.name === 'alert-thresholds-json')?.jsonNumericOrder,
+    [{ lower: 'warning', upper: 'critical' }],
+  );
 });
 
 test('blocker-list skill documents its directional response envelope', () => {

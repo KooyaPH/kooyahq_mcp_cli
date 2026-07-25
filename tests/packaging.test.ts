@@ -47,7 +47,11 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /acceptanceCriteriaJson/);
   assert.match(readme, /--direction blocked-by\|blocking\|all/);
   assert.match(readme, /--user-command/);
-  assert.match(readme, /24-character hexadecimal ObjectId/);
+  assert.match(readme, /24-character lowercase hexadecimal ObjectId/);
+  assert.match(readme, /tickets import apply.*--operation-id 123e4567-e89b-42d3-a456-426614174000/);
+  assert.match(readme, /canonical rich-text.*\{"type":"html","content":"<p>Ready to ship<\/p>"\}/i);
+  assert.match(readme, /cost analytics.*system:fullAccess/i);
+  assert.match(readme, /stored profile status/i);
   assert.match(readme, /subtask.*exactly one.*--parent-ticket-id\|--parent-ticket-key/i);
   assert.match(readme, /users templates list --output json/);
   assert.match(readme, /--page.*--all.*cannot be combined/);

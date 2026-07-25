@@ -12,13 +12,14 @@ const DEVELOPMENT_STATUSES = [
 ];
 const RICH_TEXT_SCHEMA = {
     type: 'object',
-    required: ['type'],
+    required: ['type', 'content'],
     properties: {
-        type: { const: 'doc' },
-        content: { type: 'array' },
+        type: { const: 'html' },
+        content: { type: 'string', maxLength: 100_000 },
     },
+    additionalProperties: false,
 };
-const RICH_TEXT_EXAMPLE = '{"type":"doc","content":[]}';
+const RICH_TEXT_EXAMPLE = '{"type":"html","content":"<p>Ready to ship</p>"}';
 const ACCEPTANCE_CRITERIA_SCHEMA = {
     type: 'array',
     items: {
@@ -28,6 +29,7 @@ const ACCEPTANCE_CRITERIA_SCHEMA = {
             text: { type: 'string' },
             completed: { type: 'boolean' },
         },
+        additionalProperties: false,
     },
 };
 const ACCEPTANCE_CRITERIA_EXAMPLE = '[{"text":"Verified","completed":false}]';
@@ -98,7 +100,7 @@ const ticketCreateBody = {
     'column-id': { apiName: 'columnId' },
     points: { apiName: 'points', type: 'integer', numericChoices: [1, 2, 3, 5, 8, 13] },
     priority: { apiName: 'priority', choices: PRIORITIES }, tags: { apiName: 'tags', type: 'csv' },
-    'assignee-id': { apiName: 'assigneeId' },
+    'assignee-id': { apiName: 'assigneeId', format: 'object-id' },
     'acceptance-criteria-json': {
         apiName: 'acceptanceCriteria', type: 'json-array',
         jsonSchema: ACCEPTANCE_CRITERIA_SCHEMA, example: ACCEPTANCE_CRITERIA_EXAMPLE,
@@ -111,13 +113,13 @@ const ticketCreateBody = {
     'end-date': { apiName: 'endDate', format: 'date' },
     'due-date': { apiName: 'dueDate', format: 'date' },
 };
-const { 'board-id': _boardId, 'board-key': _boardKey, 'ticket-type': _ticketType, 'parent-ticket-id': _parentTicketId, 'parent-ticket-key': _parentTicketKey, 'root-epic-id': _rootEpicId, 'root-epic-key': _rootEpicKey, ...ticketUpdateBody } = ticketCreateBody;
+const { 'board-id': _boardId, 'board-key': _boardKey, 'ticket-type': _ticketType, 'column-id': _columnId, 'parent-ticket-id': _parentTicketId, 'parent-ticket-key': _parentTicketKey, 'root-epic-id': _rootEpicId, 'root-epic-key': _rootEpicKey, ...ticketUpdateBody } = ticketCreateBody;
 const ticketUpdateWithClearBody = {
     ...ticketUpdateBody,
     'clear-description': {
         apiName: 'description',
         type: 'switch',
-        constant: { type: 'doc', content: [] },
+        constant: { type: 'html', content: '' },
     },
     'clear-assignee': { apiName: 'assigneeId', type: 'switch', constant: null },
     'clear-points': { apiName: 'points', type: 'switch', constant: null },
@@ -132,7 +134,7 @@ export const ticketCommands = [
             'board-id': { apiName: 'boardId', format: 'object-id' },
             'board-key': { apiName: 'boardKey', format: 'board-key' },
             'ticket-type': { apiName: 'ticketType', choices: TICKET_TYPES },
-            'column-id': { apiName: 'columnId' }, 'assignee-id': { apiName: 'assigneeId' },
+            'column-id': { apiName: 'columnId' }, 'assignee-id': { apiName: 'assigneeId', format: 'object-id' },
             priority: { apiName: 'priority', choices: PRIORITIES }, archived: { apiName: 'archived', type: 'boolean' },
         }, ['createdAt']), exactlyOne: [['board-id', 'board-key']] },
     { name: 'tickets get', method: 'GET', ...legacyTicketScope() },
@@ -171,7 +173,8 @@ export const ticketCommands = [
     },
     { name: 'tickets delete', method: 'DELETE', ...legacyTicketScope(), confirmation: 'Delete ticket?' },
     { name: 'tickets comments list', method: 'GET', ...legacyTicketScope('/comments', 'ticketId'), query: listQuery({
-            'author-id': { apiName: 'authorId' },
+            'author-id': { apiName: 'authorId', format: 'object-id' },
+            search: { apiName: 'search', maxLength: 200 },
         }, ['createdAt']) },
     {
         name: 'tickets comments create',
@@ -224,11 +227,16 @@ export const ticketCommands = [
             'board-id': { apiName: 'boardId', format: 'object-id' },
             'board-key': { apiName: 'boardKey', format: 'board-key' },
             archived: { apiName: 'archived', type: 'boolean' },
+            search: { apiName: 'search', maxLength: 200 },
         }, ['createdAt']),
         atMostOne: [['board-id', 'board-key']] },
     { name: 'tickets detail', method: 'GET', ...ticketScope('/detail') },
-    { name: 'tickets activities list', method: 'GET', ...ticketScope('/activities'), query: listQuery({}, ['createdAt']) },
-    { name: 'tickets viewers list', method: 'GET', ...ticketScope('/viewers'), query: listQuery({}, ['name', 'email']) },
+    { name: 'tickets activities list', method: 'GET', ...ticketScope('/activities'), query: listQuery({
+            search: { apiName: 'search', maxLength: 200 },
+        }, ['createdAt']) },
+    { name: 'tickets viewers list', method: 'GET', ...ticketScope('/viewers'), query: listQuery({
+            search: { apiName: 'search', maxLength: 200 },
+        }, ['name', 'email']) },
     { name: 'tickets archive', method: 'POST', ...ticketScope('/archive') },
     { name: 'tickets unarchive', method: 'POST', ...ticketScope('/unarchive') },
     {
@@ -311,7 +319,9 @@ export const ticketCommands = [
         ],
     },
     { name: 'tickets epic clear', method: 'DELETE', ...ticketScope('/epic') },
-    { name: 'tickets subtasks list', method: 'GET', ...ticketScope('/subtasks'), query: listQuery({}, ['createdAt']) },
+    { name: 'tickets subtasks list', method: 'GET', ...ticketScope('/subtasks'), query: listQuery({
+            search: { apiName: 'search', maxLength: 200 },
+        }, ['createdAt']) },
     { name: 'tickets criteria list', method: 'GET', ...ticketScope('/acceptance-criteria') },
     {
         name: 'tickets criteria add',
@@ -458,8 +468,10 @@ export const ticketCommands = [
         body: {
             'board-id': { apiName: 'boardId', format: 'object-id' },
             'board-key': { apiName: 'boardKey', format: 'board-key' },
+            'operation-id': { apiName: 'operationId', format: 'uuid' },
         },
         exactlyOne: [['board-id', 'board-key']],
+        requiredOptions: ['operation-id'],
         fileInput: { bodyName: 'rows', maxBytes: 5 * 1024 * 1024, maxItems: 250 },
         confirmation: 'Import tickets?',
     },

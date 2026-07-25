@@ -9,6 +9,7 @@ import {
 } from '../commands/documentation.js';
 import type { CommandSpec, OptionSpec } from '../commands/types.js';
 import { ValidationError } from '../core/errors.js';
+import { configureCatalogEntries, configureSkillOutput } from './configure-docs.js';
 import {
   TICKET_IMPORT_CSV_HEADERS,
   TICKET_IMPORT_ROW_FIELDS,
@@ -18,6 +19,8 @@ const SKILL_SCHEMA_VERSION = 2;
 
 export function skillOutput(argv: string[]): string {
   const { scope, format } = parseSkillArguments(argv);
+  const configuration = configureSkillOutput(scope, format);
+  if (configuration) return configuration;
   const name = scope.join(' ');
   const command = commandCatalog.find((candidate) => candidate.name === name);
   if (command) {
@@ -56,6 +59,10 @@ ${workflowFor(domain)}
 
 ${rows}
 
+## Local configuration
+
+${configureCatalogEntries().map((command) => `- \`${command.name}\`: ${command.summary}`).join('\n')}
+
 ## Discovery
 
 Run \`kooyahq --skill <command>\` for exact parameters, enums, relationships, examples, and safety behavior. Add \`--output json\` for machine-readable discovery.
@@ -83,6 +90,7 @@ function catalogSkillDocument(scope: string[], commands: CommandSpec[]): Record<
         confirmationRequired: Boolean(command.confirmation),
         supportsAllPages: Boolean(command.query?.page && command.query.limit),
       })),
+    localCommands: scope.length === 0 ? configureCatalogEntries() : [],
   };
 }
 
@@ -112,6 +120,7 @@ function commandSkillMarkdown(command: CommandSpec): string {
 
   const relationships = [
     ...(command.exactlyOne ?? []).map((group) => `- Exactly one of: ${group.map(flagName).join(', ')}.`),
+    ...(command.atLeastOne ?? []).map((group) => `- At least one of: ${group.map(flagName).join(', ')}.`),
     ...(command.atMostOne ?? []).map((group) => `- At most one of: ${group.map(flagName).join(', ')}.`),
     ...(command.conditionalRequirements ?? []).map(
       (rule) => `- \`--${rule.option}\` requires \`--${rule.requires} ${rule.value}\`.`,
@@ -123,12 +132,13 @@ function commandSkillMarkdown(command: CommandSpec): string {
       (group) => `- Supply together or omit together: ${group.map(flagName).join(', ')}.`,
     ),
     ...rangeDocuments(command.dateRange).map(
-      (range) => `- Date range: \`--${range.startOption}\` through \`--${range.endOption}\`, maximum ${range.maxDays} days.`,
+      (range) => `- Date range: \`--${range.startOption}\` ${range.requireDistinctDates ? 'must be before' : 'through'} \`--${range.endOption}\`, maximum ${range.maxDays} inclusive calendar dates.`,
     ),
     ...rangeDocuments(command.dateTimeRange).map(
       (range) => `- Timestamp order: \`--${range.startOption}\` must not be after \`--${range.endOption}\`.`,
     ),
   ];
+  if (command.requireBody) relationships.unshift('- At least one data option is required.');
 
   return `# KooyaHQ CLI Skill
 
@@ -218,12 +228,14 @@ function commandSkillDocument(command: CommandSpec): Record<string, unknown> {
     authentication: authenticationDocument(),
     parameters,
     exactlyOne,
+    atLeastOne: command.atLeastOne ?? [],
     atMostOne: command.atMostOne ?? [],
     conditionalRequirements: command.conditionalRequirements ?? [],
     conditionalExactlyOne: command.conditionalExactlyOne ?? [],
     pairedOptions: command.pairedOptions ?? [],
     dateRanges: rangeDocuments(command.dateRange),
     dateTimeRanges: rangeDocuments(command.dateTimeRange),
+    requiresAtLeastOneBodyOption: Boolean(command.requireBody),
     confirmationRequired: Boolean(command.confirmation),
     supportsDryRun: true,
     supportsAllPages: Boolean(command.query?.page && command.query.limit),
@@ -267,6 +279,13 @@ function parameterDocuments(
     ...(definition.format ? { format: definition.format } : {}),
     ...(definition.jsonSchema ? { jsonSchema: definition.jsonSchema } : {}),
     ...(definition.example ? { example: definition.example } : {}),
+    ...(definition.pattern ? { pattern: definition.pattern } : {}),
+    ...(definition.patternDescription ? { patternDescription: definition.patternDescription } : {}),
+    ...(definition.itemMaxLength !== undefined ? { itemMaxLength: definition.itemMaxLength } : {}),
+    ...(definition.caseInsensitiveUniqueItems
+      ? { caseInsensitiveUniqueItems: true }
+      : {}),
+    ...(definition.jsonNumericOrder ? { jsonNumericOrder: definition.jsonNumericOrder } : {}),
     ...(optionConstraints(definition).length > 0
       ? { constraints: optionConstraints(definition) }
       : {}),

@@ -24,7 +24,7 @@ export function legacyIdSelector(
 ): Pick<CommandSpec, 'path' | 'pathParams' | 'positionals' | 'requiredOptions'> {
   return {
     path,
-    pathParams: { [flag]: { apiName: pathParam } },
+    pathParams: { [flag]: { apiName: pathParam, format: 'object-id' } },
     positionals: [{
       name: positionalName,
       optional: true,
@@ -43,7 +43,7 @@ export function legacyOptionalIdSelector(
 ): Pick<CommandSpec, 'path' | 'pathParams' | 'positionals'> {
   return {
     path,
-    pathParams: { [flag]: { apiName: pathParam } },
+    pathParams: { [flag]: { apiName: pathParam, format: 'object-id' } },
     positionals: [{
       name: positionalName,
       optional: true,

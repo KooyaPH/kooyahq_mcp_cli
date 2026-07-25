@@ -46,6 +46,12 @@ export function buildRequest(catalog, argv) {
             throw new ValidationError(`${command.name} requires exactly one of ${formatFlags(group)}.`);
         }
     }
+    for (const group of command.atLeastOne ?? []) {
+        const supplied = group.filter((flag) => parsed.values[flag] !== undefined);
+        if (supplied.length === 0) {
+            throw new ValidationError(`${command.name} requires at least one of ${formatFlags(group)}.`);
+        }
+    }
     for (const group of command.atMostOne ?? []) {
         const supplied = group.filter((flag) => parsed.values[flag] !== undefined);
         if (supplied.length > 1) {
@@ -308,6 +314,14 @@ function convertValue(value, definition, flag) {
         if (definition.uniqueItems && new Set(values).size !== values.length) {
             throw new ValidationError(`--${flag} must not contain duplicates.`);
         }
+        if (definition.caseInsensitiveUniqueItems
+            && new Set(values.map((item) => item.toLocaleLowerCase())).size !== values.length) {
+            throw new ValidationError(`--${flag} must not contain duplicates, including case-insensitive duplicates.`);
+        }
+        if (definition.itemMaxLength !== undefined
+            && values.some((item) => item.length > definition.itemMaxLength)) {
+            throw new ValidationError(`--${flag} values must be at most ${definition.itemMaxLength} characters.`);
+        }
         if (definition.itemChoices) {
             const unsupported = values.find((item) => !definition.itemChoices.includes(item));
             if (unsupported) {
@@ -317,9 +331,13 @@ function convertValue(value, definition, flag) {
         return values;
     }
     if (type === 'singleton') {
-        if (!value.trim())
+        const normalized = value.trim();
+        if (!normalized)
             throw new ValidationError(`--${flag} must not be blank.`);
-        return [value];
+        if (definition.maxLength !== undefined && normalized.length > definition.maxLength) {
+            throw new ValidationError(`--${flag} must be at most ${definition.maxLength} characters.`);
+        }
+        return [normalized];
     }
     if (type === 'json-object' || type === 'json-array') {
         let parsed;
@@ -335,6 +353,17 @@ function convertValue(value, definition, flag) {
         if (!valid) {
             throw new ValidationError(`--${flag} must be a valid JSON ${type === 'json-array' ? 'array' : 'object'}.`);
         }
+        if (definition.jsonSchema && !matchesJsonSchema(parsed, definition.jsonSchema, 0)) {
+            throw new ValidationError(`--${flag} does not match its JSON schema.`);
+        }
+        for (const order of definition.jsonNumericOrder ?? []) {
+            const record = parsed;
+            const lower = record[order.lower];
+            const upper = record[order.upper];
+            if (typeof lower === 'number' && typeof upper === 'number' && lower > upper) {
+                throw new ValidationError(`--${flag} ${order.lower} must not exceed ${order.upper}.`);
+            }
+        }
         return parsed;
     }
     const trimmed = value.trim();
@@ -342,6 +371,9 @@ function convertValue(value, definition, flag) {
         throw new ValidationError(`--${flag} must not be blank.`);
     if (definition.maxLength !== undefined && trimmed.length > definition.maxLength) {
         throw new ValidationError(`--${flag} must be at most ${definition.maxLength} characters.`);
+    }
+    if (definition.pattern && !new RegExp(definition.pattern).test(trimmed)) {
+        throw new ValidationError(`--${flag} must match ${definition.patternDescription ?? definition.pattern}.`);
     }
     validateFormat(trimmed, definition.format, flag);
     return trimmed;
@@ -391,14 +423,20 @@ function validateFormat(value, format, flag) {
         return;
     }
     if (format === 'ticket-key') {
-        if (!/^[A-Za-z0-9]{1,10}-\d+$/.test(value)) {
-            throw new ValidationError(`--${flag} must look like BOARD-123.`);
+        if (!/^[A-Za-z0-9]{1,10}-[1-9]\d*$/.test(value)) {
+            throw new ValidationError(`--${flag} must look like BOARD-123 with a positive ticket sequence.`);
         }
         return;
     }
     if (format === 'object-id') {
-        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-            throw new ValidationError(`--${flag} must be a 24-character hexadecimal ObjectId.`);
+        if (!/^[0-9a-f]{24}$/.test(value)) {
+            throw new ValidationError(`--${flag} must be a 24-character lowercase hexadecimal ObjectId.`);
+        }
+        return;
+    }
+    if (format === 'uuid') {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) {
+            throw new ValidationError(`--${flag} must be a canonical lowercase UUID.`);
         }
         return;
     }
@@ -430,9 +468,64 @@ function validateDateRange(values, range) {
         / 86_400_000;
     if (days < 0)
         throw new ValidationError(`--${range.startOption} must not be after --${range.endOption}.`);
-    if (days > range.maxDays) {
-        throw new ValidationError(`Date range must not exceed ${range.maxDays} days.`);
+    if (range.requireDistinctDates && days === 0) {
+        throw new ValidationError(`--${range.startOption} must be before --${range.endOption}.`);
     }
+    if (days + 1 > range.maxDays) {
+        throw new ValidationError(`Date range must not exceed ${range.maxDays} inclusive calendar dates.`);
+    }
+}
+function matchesJsonSchema(value, schemaValue, depth) {
+    if (depth > 50 || !schemaValue || typeof schemaValue !== 'object' || Array.isArray(schemaValue))
+        return false;
+    const schema = schemaValue;
+    if ('const' in schema && value !== schema.const)
+        return false;
+    if (schema.type === 'object') {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+            return false;
+        const record = value;
+        const properties = schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)
+            ? schema.properties
+            : {};
+        const required = Array.isArray(schema.required) ? schema.required : [];
+        if (required.some((key) => typeof key !== 'string' || !(key in record)))
+            return false;
+        if (schema.additionalProperties === false && Object.keys(record).some((key) => !(key in properties)))
+            return false;
+        return Object.entries(record).every(([key, child]) => (!(key in properties) || matchesJsonSchema(child, properties[key], depth + 1)));
+    }
+    if (schema.type === 'array') {
+        if (!Array.isArray(value))
+            return false;
+        if (typeof schema.maxItems === 'number' && value.length > schema.maxItems)
+            return false;
+        if (typeof schema.minItems === 'number' && value.length < schema.minItems)
+            return false;
+        return schema.items === undefined || value.every((item) => matchesJsonSchema(item, schema.items, depth + 1));
+    }
+    if (schema.type === 'string') {
+        return typeof value === 'string'
+            && (!Array.isArray(schema.enum) || schema.enum.includes(value))
+            && (typeof schema.pattern !== 'string' || new RegExp(schema.pattern).test(value))
+            && (typeof schema.maxLength !== 'number' || value.length <= schema.maxLength)
+            && (typeof schema.minLength !== 'number' || value.length >= schema.minLength);
+    }
+    if (schema.type === 'number') {
+        return typeof value === 'number' && Number.isFinite(value)
+            && (typeof schema.minimum !== 'number' || value >= schema.minimum)
+            && (typeof schema.maximum !== 'number' || value <= schema.maximum);
+    }
+    if (schema.type === 'integer') {
+        return Number.isSafeInteger(value)
+            && (typeof schema.minimum !== 'number' || value >= schema.minimum)
+            && (typeof schema.maximum !== 'number' || value <= schema.maximum);
+    }
+    if (schema.type === 'boolean')
+        return typeof value === 'boolean';
+    if (schema.type === 'null')
+        return value === null;
+    return schema.type === undefined;
 }
 function validateDateTimeRange(values, range) {
     const start = values[range.startOption];

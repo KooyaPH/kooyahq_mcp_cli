@@ -14,7 +14,7 @@ const DOMAIN_WORKFLOWS = {
     boards: 'Select a board by exact ID or key, inspect its members and settings, then make authorized changes.',
     tickets: 'Select a board, create or find a ticket, then use the ticket ID or key for lifecycle and detail actions.',
     time: 'Start one or more timers, pause or resume as needed, then stop timers or end the workday; team reads require server permission.',
-    analytics: 'Choose an explicit date range, optionally narrow to an authorized user, then request the required analytics view.',
+    analytics: 'Choose the analytics view, supply its documented date range when required, and optionally narrow time analytics to an authorized user.',
     users: 'List users before assigning work; management actions require the corresponding server-side user permission.',
     notifications: 'List the current user notifications, inspect unread count, then mark individual or all notifications read.',
 };
@@ -91,6 +91,8 @@ export function commandExamples(command) {
     const selected = new Set(command.requiredOptions ?? []);
     for (const group of command.exactlyOne ?? [])
         selected.add(group[0]);
+    for (const group of command.atLeastOne ?? [])
+        selected.add(group[0]);
     if (command.requireBody && ![...selected].some((name) => command.body?.[name])) {
         const firstBody = Object.keys(command.body ?? {})[0];
         if (firstBody)
@@ -135,6 +137,7 @@ export function optionDescription(name, location) {
         format: 'Input or output representation accepted by this command.',
         direction: 'Blocker relationship direction; defaults to all.',
         permissions: 'Comma-separated permissions from the current backend catalog; discover templates with `kooyahq users templates list --output json`.',
+        'operation-id': 'Retry-safe identifier for this import. Reuse it only with the exact same payload.',
     };
     if (descriptions[name])
         return descriptions[name];
@@ -170,6 +173,8 @@ export function optionValueLabel(spec) {
         return '<BOARD-123>';
     if (spec.format === 'object-id')
         return '<object-id>';
+    if (spec.format === 'uuid')
+        return '<uuid>';
     if (spec.type === 'integer')
         return '<integer>';
     if (spec.type === 'number')
@@ -195,6 +200,12 @@ export function optionConstraints(spec) {
         ...(spec.maxLength !== undefined ? [`max length: ${spec.maxLength}`] : []),
         ...(spec.maxItems !== undefined ? [`max items: ${spec.maxItems}`] : []),
         ...(spec.uniqueItems ? ['unique values'] : []),
+        ...(spec.caseInsensitiveUniqueItems ? ['case-insensitive unique values'] : []),
+        ...(spec.itemMaxLength !== undefined ? [`item max length: ${spec.itemMaxLength}`] : []),
+        ...(spec.pattern ? [`pattern: ${spec.patternDescription ?? spec.pattern}`] : []),
+        ...(spec.jsonNumericOrder?.length
+            ? spec.jsonNumericOrder.map(({ lower, upper }) => `${lower} must not exceed ${upper}`)
+            : []),
         ...(spec.jsonSchema ? [`JSON schema: ${JSON.stringify(spec.jsonSchema)}`] : []),
         ...(spec.example ? [`example: ${spec.example}`] : []),
     ];
@@ -222,6 +233,8 @@ function sampleFor(name, spec) {
         return 'OPS-42';
     if (spec.format === 'object-id')
         return '507f1f77bcf86cd799439011';
+    if (spec.format === 'uuid')
+        return '123e4567-e89b-42d3-a456-426614174000';
     if (spec.type === 'boolean')
         return 'true';
     if (spec.type === 'integer' || spec.type === 'number')

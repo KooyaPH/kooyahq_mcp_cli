@@ -1,6 +1,10 @@
 import { commandCatalog } from '../commands/catalog.js';
 import { commandDocumentation, commandSummary, optionConstraints, optionDescription, optionValueLabel, workflowFor, } from '../commands/documentation.js';
+import { configureCatalogEntries, configureHelpText } from './configure-docs.js';
 export function helpText(scope = []) {
+    const configuration = configureHelpText(scope);
+    if (configuration)
+        return configuration;
     if (scope.length > 0) {
         const name = scope.join(' ');
         const command = commandCatalog.find((candidate) => candidate.name === name);
@@ -32,6 +36,9 @@ Usage:
 
 Commands:
 ${commandList(commandCatalog)}
+
+Local configuration:
+${configureCatalogEntries().map((command) => `  ${command.name.padEnd(18)}${command.summary}`).join('\n')}
 
 Global behavior:
   --output <table|json|raw>  Select tabular, structured, or unmodified text output.
@@ -66,13 +73,16 @@ function commandHelp(command) {
     options.push('  --help                 Show this help without reading configuration.');
     const groups = [
         ...(command.exactlyOne ?? []).map((group) => `  Exactly one: ${group.map(flag).join(', ')}`),
+        ...(command.atLeastOne ?? []).map((group) => `  At least one: ${group.map(flag).join(', ')}`),
         ...(command.atMostOne ?? []).map((group) => `  At most one: ${group.map(flag).join(', ')}`),
         ...(command.conditionalRequirements ?? []).map((rule) => `  Conditional: --${rule.option} requires --${rule.requires} ${rule.value}`),
         ...(command.conditionalExactlyOne ?? []).map((rule) => `  When --${rule.when.option} is ${rule.when.value}, supply exactly one of ${rule.options.map(flag).join(', ')}`),
         ...(command.pairedOptions ?? []).map((group) => `  Together: ${group.map(flag).join(', ')}`),
-        ...rangeDocuments(command.dateRange).map((range) => `  Date range: --${range.startOption} through --${range.endOption}; maximum ${range.maxDays} days`),
+        ...rangeDocuments(command.dateRange).map((range) => `  Date range: --${range.startOption} ${range.requireDistinctDates ? 'before' : 'through'} --${range.endOption}; maximum ${range.maxDays} inclusive calendar dates`),
         ...rangeDocuments(command.dateTimeRange).map((range) => `  Timestamp order: --${range.startOption} must not be after --${range.endOption}`),
     ];
+    if (command.requireBody)
+        groups.unshift('  At least one data option is required.');
     const deprecated = (command.positionals ?? [])
         .filter((positional) => positional.deprecated && positional.aliasFor)
         .map((positional) => `  <${positional.name}> is deprecated; use --${positional.aliasFor}.`);

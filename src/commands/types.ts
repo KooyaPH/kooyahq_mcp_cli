@@ -17,12 +17,17 @@ export interface OptionSpec {
   itemChoices?: string[];
   numericChoices?: number[];
   constant?: string | number | boolean | null | unknown[] | Record<string, unknown>;
-  format?: 'date' | 'datetime' | 'https-url' | 'hex-color' | 'email' | 'board-key' | 'ticket-key' | 'object-id';
+  format?: 'date' | 'datetime' | 'https-url' | 'hex-color' | 'email' | 'board-key' | 'ticket-key' | 'object-id' | 'uuid';
   min?: number;
   max?: number;
   maxLength?: number;
   maxItems?: number;
   uniqueItems?: boolean;
+  caseInsensitiveUniqueItems?: boolean;
+  itemMaxLength?: number;
+  pattern?: string;
+  patternDescription?: string;
+  jsonNumericOrder?: Array<{ lower: string; upper: string }>;
   jsonSchema?: Record<string, unknown>;
   example?: string;
 }
@@ -69,6 +74,7 @@ export interface DateRangeSpec {
   startOption: string;
   endOption: string;
   maxDays: number;
+  requireDistinctDates?: boolean;
 }
 
 export interface DateTimeRangeSpec {
@@ -84,6 +90,7 @@ export interface CommandSpec {
   pathParams?: Record<string, OptionSpec>;
   pathVariants?: PathVariant[];
   exactlyOne?: string[][];
+  atLeastOne?: string[][];
   atMostOne?: string[][];
   query?: Record<string, OptionSpec>;
   body?: Record<string, OptionSpec>;

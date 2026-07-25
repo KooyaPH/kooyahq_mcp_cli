@@ -138,7 +138,7 @@ export const boardCommands: CommandSpec[] = [
   { name: 'boards settings update', method: 'PATCH', ...legacyBoardScope('/general-settings'), body: {
     name: { apiName: 'name' },
     description: { apiName: 'description' },
-    'clear-description': { apiName: 'description', type: 'switch', constant: null },
+    'clear-description': { apiName: 'description', type: 'switch', constant: '' },
     emoji: { apiName: 'emoji' },
     ...settingsBody,
   }, requireBody: true, atMostOne: [['description', 'clear-description']] },
@@ -150,7 +150,7 @@ export const boardCommands: CommandSpec[] = [
     method: 'POST',
     ...legacyBoardScope('/members', 'boardId'),
     body: {
-      'user-id': { apiName: 'userId' },
+      'user-id': { apiName: 'userId', format: 'object-id' },
       role: { apiName: 'role', choices: ['admin', 'member', 'viewer'] },
     },
     requireBody: true,
@@ -169,7 +169,7 @@ export const boardCommands: CommandSpec[] = [
       },
     ],
     body: {
-      'user-id': { apiName: 'userId' },
+      'user-id': { apiName: 'userId', format: 'object-id' },
       role: { apiName: 'role', choices: ['admin', 'member', 'viewer'] },
     },
     requireBody: true,
@@ -187,7 +187,7 @@ export const boardCommands: CommandSpec[] = [
         name: 'userId', optional: true, aliasFor: 'user-id', deprecated: true,
       },
     ],
-    body: { 'user-id': { apiName: 'userId' } },
+    body: { 'user-id': { apiName: 'userId', format: 'object-id' } },
     requiredOptions: ['user-id'],
     confirmation: 'Remove board member?',
   },
@@ -221,8 +221,14 @@ export const boardCommands: CommandSpec[] = [
       color: { apiName: 'color', format: 'hex-color' },
       'wip-limit': { apiName: 'wipLimit', type: 'integer' },
       done: { apiName: 'isDone', type: 'boolean' },
+      'clear-color': { apiName: 'color', type: 'switch', constant: null },
+      'clear-wip-limit': { apiName: 'wipLimit', type: 'switch', constant: null },
     },
     requireBody: true,
+    atMostOne: [
+      ['color', 'clear-color'],
+      ['wip-limit', 'clear-wip-limit'],
+    ],
   },
   {
     name: 'boards columns move',
@@ -273,6 +279,7 @@ export const boardCommands: CommandSpec[] = [
       order: { apiName: 'order', type: 'integer', min: 0 },
     },
     requiredOptions: ['field'],
+    atLeastOne: [['visible', 'order']],
     requireBody: true,
   },
   {
@@ -297,7 +304,7 @@ export const boardCommands: CommandSpec[] = [
       'column-id': { apiName: 'columnId' },
       description: { apiName: 'description' },
     },
-    requiredOptions: ['status', 'column-id'],
+    requiredOptions: ['enabled', 'status', 'column-id'],
     requireBody: true,
   },
   {
@@ -310,8 +317,8 @@ export const boardCommands: CommandSpec[] = [
       'target-branch': { apiName: 'targetBranch' },
       'column-id': { apiName: 'columnId' },
       description: { apiName: 'description' },
-      'clear-target-branch': { apiName: 'targetBranch', type: 'switch', constant: null },
-      'clear-description': { apiName: 'description', type: 'switch', constant: null },
+      'clear-target-branch': { apiName: 'targetBranch', type: 'switch', constant: '' },
+      'clear-description': { apiName: 'description', type: 'switch', constant: '' },
     },
     requireBody: true,
     atMostOne: [

@@ -98,6 +98,31 @@ test('root and group help list every matching command with a concise summary', a
   }
 });
 
+test('configure help and skills are discoverable offline without exposing secrets', async () => {
+  for (const argv of [['configure', '--help'], ['configure', 'show', '--help']]) {
+    const lines: string[] = [];
+    const code = await runCli(argv, dependencies({
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }));
+    assert.equal(code, 0);
+    assert.match(lines.join('\n'), /kooyahq configure/);
+    assert.doesNotMatch(lines.join('\n'), /secret value|secret-access-key/i);
+  }
+
+  const lines: string[] = [];
+  const code = await runCli(['--skill', 'configure', '--output', 'json'], dependencies({
+    output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+  }));
+  assert.equal(code, 0);
+  const document = JSON.parse(lines.join('\n'));
+  assert.equal(document.command, 'configure');
+  assert.equal(document.authentication.required, false);
+  assert.deepEqual(document.subcommands.map((item: { name: string }) => item.name), [
+    'configure', 'configure show', 'configure clear',
+  ]);
+  assert.doesNotMatch(lines.join('\n'), /secretAccessKey|secret-access-key/i);
+});
+
 test('renders an agent-readable command skill without configuration or network traffic', async () => {
   let networkCalls = 0;
   const lines: string[] = [];
@@ -497,7 +522,7 @@ test('required create options fail before network traffic', async () => {
 
 test('prints a success message for empty successful mutation responses', async () => {
   const lines: string[] = [];
-  const code = await runCli(['projects', 'delete', 'project-1', '--yes'], dependencies({
+  const code = await runCli(['projects', 'delete', '507f1f77bcf86cd799439010', '--yes'], dependencies({
     environment: {
       KOOYAHQ_BASE_URL: 'https://example.com',
       KOOYAHQ_ACCESS_KEY_ID: 'id',

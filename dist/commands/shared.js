@@ -12,7 +12,7 @@ export const optionalId = (name = 'id') => ({ name, optional: true });
 export function legacyIdSelector(flag, pathParam, path, positionalName = 'id') {
     return {
         path,
-        pathParams: { [flag]: { apiName: pathParam } },
+        pathParams: { [flag]: { apiName: pathParam, format: 'object-id' } },
         positionals: [{
                 name: positionalName,
                 optional: true,
@@ -25,7 +25,7 @@ export function legacyIdSelector(flag, pathParam, path, positionalName = 'id') {
 export function legacyOptionalIdSelector(flag, pathParam, path, positionalName = 'id') {
     return {
         path,
-        pathParams: { [flag]: { apiName: pathParam } },
+        pathParams: { [flag]: { apiName: pathParam, format: 'object-id' } },
         positionals: [{
                 name: positionalName,
                 optional: true,

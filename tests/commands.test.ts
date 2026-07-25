@@ -49,20 +49,20 @@ test('catalog exposes the exact required command surface', () => {
 });
 
 test('maps CRUD path parameters and safely encodes path segments', () => {
-  assert.deepEqual(buildRequest(commandCatalog, ['projects', 'get', 'project / one']), {
+  assert.deepEqual(buildRequest(commandCatalog, ['projects', 'get', '507f1f77bcf86cd799439010']), {
     method: 'GET',
-    path: '/projects/project%20%2F%20one',
+    path: '/projects/507f1f77bcf86cd799439010',
     query: {},
     output: 'table',
     warnings: ['Positional <id> is deprecated; use --project-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'members', 'update-role', '507f1f77bcf86cd799439011', 'user@example.com', '--role', 'admin',
+    'boards', 'members', 'update-role', '507f1f77bcf86cd799439011', '507f1f77bcf86cd799439015', '--role', 'admin',
   ]), {
     method: 'PATCH',
     path: '/boards/507f1f77bcf86cd799439011/members',
     query: {},
-    body: { userId: 'user@example.com', role: 'admin' },
+    body: { userId: '507f1f77bcf86cd799439015', role: 'admin' },
     output: 'table',
     warnings: [
       'Positional <boardId> is deprecated; use --board-id.',
@@ -134,24 +134,24 @@ test('requires an exact board id or key for board-scoped ticket lists and create
 
 test('uses explicit resource selectors across projects, tickets, time, users, and comments', () => {
   assert.equal(
-    buildRequest(commandCatalog, ['projects', 'get', '--project-id', 'project / 1']).path,
-    '/projects/project%20%2F%201',
+    buildRequest(commandCatalog, ['projects', 'get', '--project-id', '507f1f77bcf86cd799439010']).path,
+    '/projects/507f1f77bcf86cd799439010',
   );
   assert.equal(
     buildRequest(commandCatalog, ['tickets', 'get', '--ticket-key', 'OPS-42']).path,
     '/tickets/key/OPS-42',
   );
   assert.equal(
-    buildRequest(commandCatalog, ['time', 'entries', 'get', '--entry-id', 'entry / 1']).path,
-    '/time/entries/entry%20%2F%201',
+    buildRequest(commandCatalog, ['time', 'entries', 'get', '--entry-id', '507f1f77bcf86cd799439014']).path,
+    '/time/entries/507f1f77bcf86cd799439014',
   );
   assert.equal(
-    buildRequest(commandCatalog, ['time', 'timers', 'pause', '--timer-id', 'timer / 1']).path,
-    '/time/timers/timer%20%2F%201/pause',
+    buildRequest(commandCatalog, ['time', 'timers', 'pause', '--timer-id', '507f1f77bcf86cd799439013']).path,
+    '/time/timers/507f1f77bcf86cd799439013/pause',
   );
   assert.equal(
-    buildRequest(commandCatalog, ['users', 'get', '--user-id', 'user / 1']).path,
-    '/users/user%20%2F%201',
+    buildRequest(commandCatalog, ['users', 'get', '--user-id', '507f1f77bcf86cd799439015']).path,
+    '/users/507f1f77bcf86cd799439015',
   );
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'comments', 'create', '--ticket-key', 'OPS-42', '--content', 'Ready',
@@ -164,9 +164,9 @@ test('aligns favorite and member mutations with the backend body contract', () =
     warnings: ['Positional <id> is deprecated; use --board-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'members', 'remove', '507f1f77bcf86cd799439011', 'user-1', '--yes',
+    'boards', 'members', 'remove', '507f1f77bcf86cd799439011', '507f1f77bcf86cd799439015', '--yes',
   ]), {
-    method: 'DELETE', path: '/boards/507f1f77bcf86cd799439011/members', query: {}, body: { userId: 'user-1' }, output: 'table',
+    method: 'DELETE', path: '/boards/507f1f77bcf86cd799439011/members', query: {}, body: { userId: '507f1f77bcf86cd799439015' }, output: 'table',
     warnings: [
       'Positional <boardId> is deprecated; use --board-id.',
       'Positional <userId> is deprecated; use --user-id.',
@@ -224,17 +224,14 @@ test('maps backend-specific whoami, timer, ticket, comment, and analytics contra
     body: { projects: ['project-1'], task: 'Review' }, output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'time', 'timers', 'add-task', 'timer-1', '--task', 'Ship release',
+    'time', 'timers', 'add-task', '507f1f77bcf86cd799439013', '--task', 'Ship release',
   ]), {
-    method: 'POST', path: '/time/timers/timer-1/tasks', query: {}, body: { task: 'Ship release' }, output: 'table',
+    method: 'POST', path: '/time/timers/507f1f77bcf86cd799439013/tasks', query: {}, body: { task: 'Ship release' }, output: 'table',
     warnings: ['Positional <id> is deprecated; use --timer-id.'],
   });
-  assert.deepEqual(buildRequest(commandCatalog, [
+  assert.throws(() => buildRequest(commandCatalog, [
     'tickets', 'update', '507f1f77bcf86cd799439012', '--column-id', 'column-2',
-  ]), {
-    method: 'PATCH', path: '/tickets/507f1f77bcf86cd799439012', query: {}, body: { columnId: 'column-2' }, output: 'table',
-    warnings: ['Positional <id> is deprecated; use --ticket-id.'],
-  });
+  ]), /Unknown option --column-id/);
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'comments', 'create', '507f1f77bcf86cd799439012', '--content', 'Ready',
   ]), {
@@ -251,6 +248,33 @@ test('maps backend-specific whoami, timer, ticket, comment, and analytics contra
     () => buildRequest(commandCatalog, ['analytics', 'team', '--start-date', '2026-07-01']),
     /requires --end-date/,
   );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'analytics', 'time', '--start-date', '2026-07-01', '--end-date', '2026-07-31',
+    '--user-id', '507f1f77bcf86cd799439015',
+  ]).query, {
+    startDate: '2026-07-01', endDate: '2026-07-31', userId: '507f1f77bcf86cd799439015',
+  });
+  assert.throws(() => buildRequest(commandCatalog, [
+    'analytics', 'team', '--start-date', '2026-07-01', '--end-date', '2026-07-31',
+    '--user-id', '507f1f77bcf86cd799439015',
+  ]), /Unknown option --user-id/);
+  assert.deepEqual(buildRequest(commandCatalog, ['analytics', 'costs']).query, {});
+  assert.throws(
+    () => buildRequest(commandCatalog, ['analytics', 'costs', '--start-date', '2026-07-01']),
+    /requires --end-date/,
+  );
+});
+
+test('exposes backend-supported search on paginated time reads', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'time', 'timers', 'list', '--search', 'Kooya',
+  ]).query, { search: 'Kooya' });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'time', 'entries', 'list', '--search', 'release',
+  ]).query, { search: 'release' });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'time', 'entries', 'today', '--search', 'review',
+  ]).query, { search: 'review' });
 });
 
 test('maps only live KooyaHQ project fields', () => {
@@ -273,13 +297,15 @@ test('maps only live KooyaHQ project fields', () => {
 test('enforces and maps the board create/update contracts', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'boards', 'create', '--name', 'Delivery', '--type', 'kanban', '--description', 'Work',
-    '--prefix', 'DEL', '--emoji', '📦', '--columns-json', '[{"name":"Ready"}]',
+    '--prefix', 'DEL', '--emoji', '📦',
+    '--columns-json', '[{"id":"ready","name":"Ready","order":0,"isDoneColumn":false}]',
     '--settings-json', '{"defaultView":"board"}',
   ]), {
     method: 'POST', path: '/boards', query: {},
     body: {
       name: 'Delivery', type: 'kanban', description: 'Work', prefix: 'DEL', emoji: '📦',
-      columns: [{ name: 'Ready' }], settings: { defaultView: 'board' },
+      columns: [{ id: 'ready', name: 'Ready', order: 0, isDoneColumn: false }],
+      settings: { defaultView: 'board' },
     },
     output: 'table',
   });
@@ -357,13 +383,13 @@ test('maps board workflow commands with explicit selectors and semantic mutation
 test('enforces and maps ticket JSON, array, and required fields', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task', '--title', 'Ship',
-    '--description-json', '{"type":"doc"}', '--acceptance-criteria-json', '[{"text":"Verified"}]',
+    '--description-json', '{"type":"html","content":"<p>Ship safely</p>"}', '--acceptance-criteria-json', '[{"text":"Verified"}]',
     '--tags', 'release, urgent', '--points', '3', '--parent-ticket-key', 'OPS-7',
     '--root-epic-id', '507f1f77bcf86cd799439014',
   ]), {
     method: 'POST', path: '/tickets', query: {},
     body: {
-      boardId: '507f1f77bcf86cd799439011', ticketType: 'task', title: 'Ship', description: { type: 'doc' },
+      boardId: '507f1f77bcf86cd799439011', ticketType: 'task', title: 'Ship', description: { type: 'html', content: '<p>Ship safely</p>' },
       acceptanceCriteria: [{ text: 'Verified' }], tags: ['release', 'urgent'], points: 3,
       parentTicketKey: 'OPS-7', rootEpicId: '507f1f77bcf86cd799439014',
     },
@@ -376,6 +402,13 @@ test('enforces and maps ticket JSON, array, and required fields', () => {
   assert.throws(
     () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task', '--title', 'x', '--description-json', 'not-json']),
     /valid JSON object/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task',
+      '--title', 'x', '--description-json', '{"type":"doc","content":[]}',
+    ]),
+    /schema/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task', '--title', 'x', '--acceptance-criteria-json', '{"text":"wrong shape"}']),
@@ -401,19 +434,46 @@ test('uses explicit clear flags and rejects conflicting set-and-clear options', 
   ]).body, {
     assigneeId: null,
     dueDate: null,
-    description: { type: 'doc', content: [] },
+    description: { type: 'html', content: '' },
     tags: [],
   });
   assert.throws(
     () => buildRequest(commandCatalog, [
       'tickets', 'update', '--ticket-id', '507f1f77bcf86cd799439012',
-      '--assignee-id', 'user-1', '--clear-assignee',
+      '--assignee-id', '507f1f77bcf86cd799439015', '--clear-assignee',
     ]),
     /at most one of --assignee-id or --clear-assignee/,
   );
   assert.deepEqual(buildRequest(commandCatalog, [
     'boards', 'settings', 'update', '--board-id', '507f1f77bcf86cd799439011', '--clear-description',
-  ]).body, { description: null });
+  ]).body, { description: '' });
+
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'boards', 'automation', 'update', '--board-id', '507f1f77bcf86cd799439011',
+    '--rule-id', 'rule_1', '--clear-target-branch', '--clear-description',
+  ]).body, { targetBranch: '', description: '' });
+
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'boards', 'columns', 'update', '--board-id', '507f1f77bcf86cd799439011',
+    '--column-id', 'todo', '--clear-color', '--clear-wip-limit',
+  ]).body, { color: null, wipLimit: null });
+});
+
+test('matches board automation and ticket-detail-field mutation requirements', () => {
+  assert.throws(() => buildRequest(commandCatalog, [
+    'boards', 'automation', 'add', '--board-key', 'OPS', '--status', 'deployed', '--column-id', 'done',
+  ]), /requires --enabled/);
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'boards', 'automation', 'add', '--board-key', 'OPS', '--enabled', 'true',
+    '--status', 'deployed', '--column-id', 'done',
+  ]).body, { enabled: true, status: 'deployed', columnId: 'done' });
+  assert.throws(() => buildRequest(commandCatalog, [
+    'boards', 'settings', 'fields', 'set', '--board-key', 'OPS', '--field', 'priority',
+  ]), /at least one of --visible or --order/);
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'boards', 'settings', 'fields', 'set', '--board-key', 'OPS', '--field', 'priority',
+    '--visible', 'false', '--order', '2',
+  ]).body, { field: 'priority', visible: false, order: 2 });
 });
 
 test('maps ticket lifecycle, hierarchy, link, and development workflow commands', () => {
@@ -541,7 +601,7 @@ test('rejects unsafe URLs, invalid ranges, and oversized timer batches locally',
     () => buildRequest(commandCatalog, [
       'analytics', 'time', '--start-date', '2025-01-01', '--end-date', '2026-07-01',
     ]),
-    /must not exceed 366 days/,
+    /must not exceed 366 inclusive calendar dates/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
@@ -578,14 +638,14 @@ test('maps self mutations and permission-gated team time reads', () => {
     'time', 'entries', 'create', '--projects', 'p1', '--task', 'Delivery',
   ]), /requires --duration/);
   assert.deepEqual(buildRequest(commandCatalog, [
-    'time', 'entries', 'list', '--scope', 'team', '--user-id', 'u1',
+    'time', 'entries', 'list', '--scope', 'team', '--user-id', '507f1f77bcf86cd799439015',
     '--start-date', '2026-07-01', '--end-date', '2026-07-31',
   ]).query, {
-    scope: 'team', userId: 'u1', startDate: '2026-07-01', endDate: '2026-07-31',
+    scope: 'team', userId: '507f1f77bcf86cd799439015', startDate: '2026-07-01', endDate: '2026-07-31',
   });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'time', 'entries', 'update', 'entry-1', '--user-id', 'u1',
+      'time', 'entries', 'update', '507f1f77bcf86cd799439014', '--user-id', '507f1f77bcf86cd799439015',
     ]),
     /Unknown option --user-id/,
   );
@@ -593,16 +653,22 @@ test('maps self mutations and permission-gated team time reads', () => {
 
 test('allows a time user filter only for an explicit team scope', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
-    'time', 'entries', 'list', '--scope', 'team', '--user-id', 'user-1',
-  ]).query, { scope: 'team', userId: 'user-1' });
+    'time', 'entries', 'list', '--scope', 'team', '--user-id', '507f1f77bcf86cd799439015',
+  ]).query, { scope: 'team', userId: '507f1f77bcf86cd799439015' });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'time', 'entries', 'list', '--scope', 'me', '--user-id', 'user-1',
+      'time', 'entries', 'list', '--scope', 'team', '--user-id', 'user-1',
+    ]),
+    /24-character lowercase hexadecimal ObjectId/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'time', 'entries', 'list', '--scope', 'me', '--user-id', '507f1f77bcf86cd799439015',
     ]),
     /--user-id requires --scope team/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['time', 'entries', 'today', '--user-id', 'user-1']),
+    () => buildRequest(commandCatalog, ['time', 'entries', 'today', '--user-id', '507f1f77bcf86cd799439015']),
     /--user-id requires --scope team/,
   );
 });
@@ -656,10 +722,10 @@ test('maps multiple timer, workday, and notification actions', () => {
     'End the current workday and stop all active timers?',
   );
   assert.deepEqual(buildRequest(commandCatalog, [
-    'notifications', 'mark-read', '--notification-id', 'notification / 1',
+    'notifications', 'mark-read', '--notification-id', '507f1f77bcf86cd799439016',
   ]), {
     method: 'PATCH',
-    path: '/notifications/notification%20%2F%201/read',
+    path: '/notifications/507f1f77bcf86cd799439016/read',
     query: {},
     output: 'table',
   });
@@ -668,6 +734,34 @@ test('maps multiple timer, workday, and notification actions', () => {
   ]), {
     method: 'PATCH', path: '/notifications/read-all', query: {}, output: 'table',
   });
+});
+
+test('requires a canonical operation id for retry-safe ticket import apply', () => {
+  const operationId = '123e4567-e89b-42d3-a456-426614174000';
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'import', 'apply', '--board-key', 'OPS', '--operation-id', operationId,
+    '--stdin', '--format', 'json', '--yes',
+  ]), {
+    method: 'POST', path: '/tickets/import', query: {},
+    body: { boardKey: 'OPS', operationId }, output: 'table',
+    fileInput: {
+      bodyName: 'rows', maxBytes: 5 * 1024 * 1024, maxItems: 250,
+      stdin: true, format: 'json',
+    },
+  });
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'import', 'apply', '--board-key', 'OPS', '--stdin', '--format', 'json',
+    ]),
+    /requires --operation-id/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'import', 'apply', '--board-key', 'OPS', '--operation-id', operationId.toUpperCase(),
+      '--stdin', '--format', 'json',
+    ]),
+    /lowercase UUID/,
+  );
 });
 
 test('maps user and notification fields to the live API', () => {
@@ -679,8 +773,13 @@ test('maps user and notification fields to the live API', () => {
     permissions: ['projects:view', 'board:update'], bio: 'Builder',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'users', 'list', '--search', 'sam', '--include-disabled', 'true', '--sort', 'name', '--order', 'asc',
-  ]).query, { search: 'sam', includeDisabled: true, sortBy: 'name', sortOrder: 'asc' });
+    'users', 'list', '--search', 'sam', '--include-disabled', 'true', '--position', 'Developer',
+    '--status', 'online', '--created-from', '2026-01-01', '--created-to', '2026-01-31',
+    '--sort', 'name', '--order', 'asc',
+  ]).query, {
+    search: 'sam', includeDisabled: true, position: 'Developer', status: 'online',
+    createdFrom: '2026-01-01', createdTo: '2026-01-31', sortBy: 'name', sortOrder: 'asc',
+  });
   assert.throws(() => buildRequest(commandCatalog, ['users', 'create', '--role', 'admin']), /Unknown option --role/);
   assert.throws(() => buildRequest(commandCatalog, ['users', 'create', '--name', 'Missing email']), /requires --email/);
   assert.throws(() => buildRequest(commandCatalog, ['users', 'create', '--email', 'missing@example.com']), /requires --name/);
@@ -698,20 +797,40 @@ test('maps remaining frontend project and user management actions', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'projects', 'keyword-migration', 'apply', '--source-projects', 'Kooya', '--yes',
   ]).body, { sourceProjects: ['Kooya'] });
-  assert.deepEqual(buildRequest(commandCatalog, [
+  assert.throws(() => buildRequest(commandCatalog, [
     'users', 'clients', 'create', '--name', 'Client', '--email', 'client@example.com',
     '--client-company-id', 'company-1',
-  ]).body, { name: 'Client', email: 'client@example.com', clientCompanyId: 'company-1' });
+  ]), /Unknown option --client-company-id/);
   assert.deepEqual(buildRequest(commandCatalog, [
-    'users', 'activity', 'list', '--action', 'user.updated',
-    '--start-date', '2026-07-01', '--end-date', '2026-07-25', '--limit', '50',
+    'users', 'activity', 'list', '--action', 'update_user',
+    '--search', 'sam@example.com', '--start-date', '2026-07-01', '--end-date', '2026-07-25', '--limit', '50',
   ]).query, {
-    action: 'user.updated', startDate: '2026-07-01', endDate: '2026-07-25', limit: 50,
+    action: 'update_user', search: 'sam@example.com',
+    startDate: '2026-07-01', endDate: '2026-07-25', limit: 50,
   });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['users', 'activity', 'list', '--action', 'user.updated']),
+    /--action must be/,
+  );
   assert.equal(
     buildRequest(commandCatalog, ['users', 'export', '--format', 'csv', '--output', 'raw']).output,
     'raw',
   );
+});
+
+test('uses explicit project and user profile clear flags', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'projects', 'update', '--project-id', '507f1f77bcf86cd799439010',
+    '--clear-emoji', '--clear-icon-url',
+  ]).body, { emoji: '', iconUrl: '' });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'users', 'update', '--user-id', '507f1f77bcf86cd799439015',
+    '--clear-position', '--clear-birthday', '--clear-bio',
+  ]).body, { position: '', birthday: '', bio: '' });
+  assert.throws(() => buildRequest(commandCatalog, [
+    'projects', 'update', '--project-id', '507f1f77bcf86cd799439010',
+    '--emoji', '🚀', '--clear-emoji',
+  ]), /at most one of --emoji or --clear-emoji/);
 });
 
 test('maps frontend cost analytics reads and budget management actions', () => {
@@ -737,11 +856,21 @@ test('maps frontend cost analytics reads and budget management actions', () => {
     ]),
     /requires --current-end/,
   );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['analytics', 'costs', 'budgets', 'comparisons', '--limit', '21']),
+    /integer from 1 to 20/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'analytics', 'costs', 'forecast', '--start-date', '2026-01-01', '--end-date', '2026-01-31', '--days', '366',
+    ]),
+    /integer from 1 to 365/,
+  );
 });
 
 test('requires board member identity and role locally', () => {
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'members', 'add', '507f1f77bcf86cd799439011', '--user-id', 'user-1']),
+    () => buildRequest(commandCatalog, ['boards', 'members', 'add', '507f1f77bcf86cd799439011', '--user-id', '507f1f77bcf86cd799439015']),
     /requires --role/,
   );
   assert.throws(
@@ -749,29 +878,29 @@ test('requires board member identity and role locally', () => {
     /requires --user-id/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'members', 'update-role', '507f1f77bcf86cd799439011', 'user-1']),
+    () => buildRequest(commandCatalog, ['boards', 'members', 'update-role', '507f1f77bcf86cd799439011', '507f1f77bcf86cd799439015']),
     /requires --role/,
   );
 });
 
 test('limits time entry update to projects, task, and duration', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
-    'time', 'entries', 'update', 'entry-1', '--projects', 'p1,p2', '--task', 'Review', '--duration', '30',
+    'time', 'entries', 'update', '507f1f77bcf86cd799439014', '--projects', 'p1,p2', '--task', 'Review', '--duration', '30',
   ]).body, { projects: ['p1', 'p2'], task: 'Review', duration: 30 });
   assert.throws(
-    () => buildRequest(commandCatalog, ['time', 'entries', 'update', 'entry-1', '--start-time', '2026-07-24T00:00:00Z']),
+    () => buildRequest(commandCatalog, ['time', 'entries', 'update', '507f1f77bcf86cd799439014', '--start-time', '2026-07-24T00:00:00Z']),
     /Unknown option --start-time/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['time', 'entries', 'update', 'entry-1', '--is-overtime', 'true']),
+    () => buildRequest(commandCatalog, ['time', 'entries', 'update', '507f1f77bcf86cd799439014', '--is-overtime', 'true']),
     /Unknown option --is-overtime/,
   );
 });
 
 test('requires confirmation for destructive bulk or delete operations', () => {
   assert.equal(
-    buildRequest(commandCatalog, ['projects', 'delete', 'p1']).confirmation,
-    'Delete project p1?',
+    buildRequest(commandCatalog, ['projects', 'delete', '507f1f77bcf86cd799439010']).confirmation,
+    'Delete project 507f1f77bcf86cd799439010?',
   );
   assert.equal(
     buildRequest(commandCatalog, ['time', 'timers', 'stop-all', '--yes']).confirmation,
@@ -823,6 +952,15 @@ test('validates calendar dates, strict timestamps, and every declared range loca
     ]),
     /must not be after/,
   );
+  assert.doesNotThrow(() => buildRequest(commandCatalog, [
+    'time', 'entries', 'list', '--start-date', '2025-01-01', '--end-date', '2026-01-01',
+  ]));
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'time', 'entries', 'list', '--start-date', '2025-01-01', '--end-date', '2026-01-02',
+    ]),
+    /must not exceed 366 inclusive calendar dates/,
+  );
   assert.throws(
     () => buildRequest(commandCatalog, [
       'time', 'entries', 'create', '--projects', 'Kooya', '--task', 'Review', '--duration', '30',
@@ -851,7 +989,7 @@ test('validates calendar dates, strict timestamps, and every declared range loca
       '--current-start', '2025-01-01', '--current-end', '2026-07-25',
       '--previous-start', '2024-01-01', '--previous-end', '2024-01-31',
     ]),
-    /Date range must not exceed 366 days/,
+    /Date range must not exceed 366 inclusive calendar dates/,
   );
 });
 
@@ -878,21 +1016,21 @@ test('maps user WhatsApp and explicit permission clearing without ambiguous empt
     name: 'Sam', email: 'sam@example.com', whatsappPhone: '+639171234567',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'users', 'update', '--user-id', 'user-1', '--clear-whatsapp-phone', '--clear-permissions',
+    'users', 'update', '--user-id', '507f1f77bcf86cd799439015', '--clear-whatsapp-phone', '--clear-permissions',
   ]).body, { whatsappPhone: null, permissions: [] });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'users', 'permissions', 'update', '--user-id', 'user-1', '--clear-permissions',
+    'users', 'permissions', 'update', '--user-id', '507f1f77bcf86cd799439015', '--clear-permissions',
   ]).body, { permissions: [] });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'users', 'update', '--user-id', 'user-1', '--whatsapp-phone', '+639171234567',
+      'users', 'update', '--user-id', '507f1f77bcf86cd799439015', '--whatsapp-phone', '+639171234567',
       '--clear-whatsapp-phone',
     ]),
     /at most one of --whatsapp-phone or --clear-whatsapp-phone/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'users', 'permissions', 'update', '--user-id', 'user-1',
+      'users', 'permissions', 'update', '--user-id', '507f1f77bcf86cd799439015',
       '--permissions', 'boards.read', '--clear-permissions',
     ]),
     /at most one of --permissions or --clear-permissions/,
@@ -902,18 +1040,18 @@ test('maps user WhatsApp and explicit permission clearing without ambiguous empt
 test('requires real ObjectId selectors and a parent for subtasks', () => {
   assert.throws(
     () => buildRequest(commandCatalog, ['boards', 'get', '--board-id', 'board-1']),
-    /24-character hexadecimal ObjectId/,
+    /24-character lowercase hexadecimal ObjectId/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, ['tickets', 'get', '--ticket-id', 'ticket-1']),
-    /24-character hexadecimal ObjectId/,
+    /24-character lowercase hexadecimal ObjectId/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
       'tickets', 'move', '--ticket-id', '507f1f77bcf86cd799439012',
       '--column-id', 'column-2', '--before-ticket-id', 'ticket-2',
     ]),
-    /24-character hexadecimal ObjectId/,
+    /24-character lowercase hexadecimal ObjectId/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
@@ -931,14 +1069,72 @@ test('requires real ObjectId selectors and a parent for subtasks', () => {
   });
 });
 
+test('rejects locally valid-looking values that violate backend contracts', () => {
+  assert.throws(() => buildRequest(commandCatalog, [
+    'projects', 'create', '--name', 'x'.repeat(101),
+  ]), /at most 100 characters/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'users', 'create', '--name', 'Sam', '--email', 'sam@example.com',
+    '--permissions', 'projects:view,projects:view',
+  ]), /must not contain duplicates/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'time', 'timers', 'start-many', '--projects', 'Project,project',
+  ]), /case-insensitive duplicates/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'time', 'entries', 'create', '--projects', Array.from({ length: 21 }, (_, index) => `P${index}`).join(','),
+    '--task', 'work', '--duration', '1',
+  ]), /at most 20 values/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'time', 'entries', 'create', '--projects', 'Kooya', '--task', 'x'.repeat(1001), '--duration', '1',
+  ]), /at most 1000 characters/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'time', 'entries', 'create', '--projects', 'Kooya', '--task', 'work', '--duration', '1000001',
+  ]), /to 1000000/);
+  assert.throws(
+    () => buildRequest(commandCatalog, ['tickets', 'get', '--ticket-key', 'OPS-0']),
+    /positive ticket sequence/,
+  );
+  assert.throws(() => buildRequest(commandCatalog, [
+    'analytics', 'costs', 'budgets', 'create', '--start-date', '2026-08-01',
+    '--end-date', '2026-08-01', '--amount', '100',
+  ]), /must be before/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'analytics', 'costs', 'budgets', 'create', '--start-date', '2026-08-01',
+    '--end-date', '2026-08-02', '--amount', '100', '--currency', '123',
+  ]), /three ASCII letters/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'analytics', 'costs', 'budgets', 'update', '--budget-id', '507f1f77bcf86cd799439010',
+    '--alert-thresholds-json', '{"warning":75}',
+  ]), /does not match its JSON schema/);
+  assert.throws(() => buildRequest(commandCatalog, [
+    'analytics', 'costs', 'budgets', 'update', '--budget-id', '507f1f77bcf86cd799439010',
+    '--alert-thresholds-json', '{"warning":95,"critical":90}',
+  ]), /warning must not exceed critical/);
+});
+
+test('exposes search on backend-paginated ticket and cost lists', () => {
+  for (const command of [
+    ['tickets', 'comments', 'list', '--ticket-key', 'OPS-42', '--search', 'ready'],
+    ['tickets', 'assigned', '--search', 'release'],
+    ['tickets', 'activities', 'list', '--ticket-key', 'OPS-42', '--search', 'status'],
+    ['tickets', 'viewers', 'list', '--ticket-key', 'OPS-42', '--search', 'sam'],
+    ['tickets', 'subtasks', 'list', '--ticket-key', 'OPS-42', '--search', 'child'],
+    ['analytics', 'costs', 'projects', 'list', '--search', 'Kooya'],
+    ['analytics', 'costs', 'budgets', 'list', '--search', 'PHP'],
+    ['analytics', 'costs', 'budgets', 'comparisons', '--search', 'Kooya'],
+  ]) {
+    assert.equal(buildRequest(commandCatalog, command).query.search, command.at(-1));
+  }
+});
+
 test('maps the flattened improve and development contracts', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'improve-draft', '--board-key', 'OPS', '--title', 'Release',
-    '--description-json', '{"type":"doc","content":[]}',
+    '--description-json', '{"type":"html","content":"<p>Release</p>"}',
     '--acceptance-criteria-json', '[{"text":"Verified"}]', '--ticket-type', 'task',
     '--user-command', 'Focus on rollback',
   ]).body, {
-    boardKey: 'OPS', title: 'Release', description: { type: 'doc', content: [] },
+    boardKey: 'OPS', title: 'Release', description: { type: 'html', content: '<p>Release</p>' },
     acceptanceCriteria: [{ text: 'Verified' }], ticketType: 'task',
     userCommand: 'Focus on rollback',
   });
@@ -959,12 +1155,12 @@ test('maps the flattened improve and development contracts', () => {
 
 test('validates permission list items against the backend permission catalog', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
-    'users', 'permissions', 'update', '--user-id', 'user-1',
+    'users', 'permissions', 'update', '--user-id', '507f1f77bcf86cd799439015',
     '--permissions', 'users:view,projects:manage',
   ]).body, { permissions: ['users:view', 'projects:manage'] });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'users', 'permissions', 'update', '--user-id', 'user-1',
+      'users', 'permissions', 'update', '--user-id', '507f1f77bcf86cd799439015',
       '--permissions', 'users:view,projects.read',
     ]),
     /--permissions contains unsupported value projects\.read/,

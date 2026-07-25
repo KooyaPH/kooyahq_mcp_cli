@@ -1,7 +1,11 @@
 import { legacyIdSelector, legacyOptionalIdSelector, listQuery } from '../shared.js';
 const entryBody = {
-    projects: { apiName: 'projects', type: 'csv' }, task: { apiName: 'task' },
-    duration: { apiName: 'duration', type: 'integer' },
+    projects: {
+        apiName: 'projects', type: 'csv', maxItems: 20,
+        caseInsensitiveUniqueItems: true, itemMaxLength: 100,
+    },
+    task: { apiName: 'task', maxLength: 1_000 },
+    duration: { apiName: 'duration', type: 'integer', min: 1, max: 1_000_000 },
     'start-time': { apiName: 'startTime', format: 'datetime' },
     'end-time': { apiName: 'endTime', format: 'datetime' },
     'is-overtime': { apiName: 'isOvertime', type: 'boolean' },
@@ -14,9 +18,11 @@ const entryUpdateBody = {
 export const timeCommands = [
     { name: 'time timers list', method: 'GET', path: '/time/timers', query: listQuery({
             status: { apiName: 'status', choices: ['running', 'paused'] },
+            search: { apiName: 'search', maxLength: 200 },
         }, ['createdAt', 'startTime']) },
     { name: 'time timers start', method: 'POST', path: '/time/timers', body: {
-            project: { apiName: 'projects', type: 'singleton' }, task: { apiName: 'task' },
+            project: { apiName: 'projects', type: 'singleton', maxLength: 100 },
+            task: { apiName: 'task', maxLength: 1_000 },
             'is-overtime': { apiName: 'isOvertime', type: 'boolean' },
         }, requiredOptions: ['project'] },
     {
@@ -41,7 +47,7 @@ export const timeCommands = [
     },
     { name: 'time timers stop-all', method: 'POST', path: '/time/timers/stop-all', confirmation: 'Stop all running timers?' },
     { name: 'time timers add-task', method: 'POST', ...legacyIdSelector('timer-id', 'timerId', '/time/timers/:timerId/tasks'), body: {
-            task: { apiName: 'task' },
+            task: { apiName: 'task', maxLength: 1_000 },
         }, requireBody: true },
     { name: 'time entries list', method: 'GET', path: '/time/entries', query: listQuery({
             project: { apiName: 'project' }, active: { apiName: 'active', type: 'boolean' },
@@ -49,7 +55,8 @@ export const timeCommands = [
             'start-date': { apiName: 'startDate', format: 'date' },
             'end-date': { apiName: 'endDate', format: 'date' },
             scope: { apiName: 'scope', choices: ['me', 'team'] },
-            'user-id': { apiName: 'userId' },
+            'user-id': { apiName: 'userId', format: 'object-id' },
+            search: { apiName: 'search', maxLength: 200 },
         }, ['createdAt', 'startTime', 'duration']), conditionalRequirements: [
             { option: 'user-id', requires: 'scope', value: 'team' },
         ], pairedOptions: [['start-date', 'end-date']],
@@ -67,8 +74,11 @@ export const timeCommands = [
         method: 'POST',
         path: '/time/timers/start-many',
         body: {
-            projects: { apiName: 'projects', type: 'csv', maxItems: 20, uniqueItems: true },
-            task: { apiName: 'task' },
+            projects: {
+                apiName: 'projects', type: 'csv', maxItems: 20,
+                caseInsensitiveUniqueItems: true, itemMaxLength: 100,
+            },
+            task: { apiName: 'task', maxLength: 1_000 },
             'is-overtime': { apiName: 'isOvertime', type: 'boolean' },
         },
         requiredOptions: ['projects'],
@@ -87,8 +97,9 @@ export const timeCommands = [
         path: '/time/entries/today',
         query: listQuery({
             scope: { apiName: 'scope', choices: ['me', 'team'] },
-            'user-id': { apiName: 'userId' },
+            'user-id': { apiName: 'userId', format: 'object-id' },
             project: { apiName: 'project' },
+            search: { apiName: 'search', maxLength: 200 },
         }, ['createdAt', 'startTime', 'duration']),
         conditionalRequirements: [
             { option: 'user-id', requires: 'scope', value: 'team' },
