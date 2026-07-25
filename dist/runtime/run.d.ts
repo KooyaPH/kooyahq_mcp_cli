@@ -3,6 +3,7 @@ export interface RuntimeDependencies {
     homeDirectory: string;
     platform: NodeJS.Platform;
     version: string;
+    clientName?: 'kooyahq-cli' | 'kooyahq-mcp';
     fetch?: typeof globalThis.fetch;
     prompt: (question: string, hidden?: boolean) => Promise<string>;
     readInputFile: (path: string, maxBytes: number) => Promise<Uint8Array>;

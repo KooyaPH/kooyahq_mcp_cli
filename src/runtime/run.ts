@@ -21,6 +21,7 @@ export interface RuntimeDependencies {
   homeDirectory: string;
   platform: NodeJS.Platform;
   version: string;
+  clientName?: 'kooyahq-cli' | 'kooyahq-mcp';
   fetch?: typeof globalThis.fetch;
   prompt: (question: string, hidden?: boolean) => Promise<string>;
   readInputFile: (path: string, maxBytes: number) => Promise<Uint8Array>;
@@ -271,6 +272,7 @@ function createClient(credentials: Credentials, dependencies: RuntimeDependencie
   return new ApiClient({
     ...credentials,
     version: dependencies.version,
+    ...(dependencies.clientName ? { clientName: dependencies.clientName } : {}),
     platform: dependencies.platform,
     nodeVersion: process.versions.node,
     ...(dependencies.fetch ? { fetch: dependencies.fetch } : {}),

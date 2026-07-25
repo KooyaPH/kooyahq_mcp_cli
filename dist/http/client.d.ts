@@ -8,6 +8,7 @@ export interface RequestOptions {
 }
 export interface ApiClientOptions extends Credentials {
     version: string;
+    clientName?: 'kooyahq-cli' | 'kooyahq-mcp';
     platform?: NodeJS.Platform;
     nodeVersion?: string;
     fetch?: typeof globalThis.fetch;
