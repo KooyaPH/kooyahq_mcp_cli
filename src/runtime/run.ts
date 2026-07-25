@@ -10,8 +10,11 @@ import type { Credentials } from '../config/types.js';
 import { DEFAULT_BASE_URL, validateBaseUrl } from '../config/url.js';
 import { CliError, ConfigError, publicErrorMessage, ValidationError } from '../core/errors.js';
 import { ApiClient } from '../http/client.js';
+import { readBoundedFile, readBoundedStdin } from '../input/read-bounded.js';
+import { parseTicketImport } from '../input/ticket-import.js';
 import { formatOutput } from '../output/format.js';
 import { helpText } from './help.js';
+import { skillOutput } from './skill.js';
 
 export interface RuntimeDependencies {
   environment: NodeJS.ProcessEnv;
@@ -20,6 +23,8 @@ export interface RuntimeDependencies {
   version: string;
   fetch: typeof globalThis.fetch;
   prompt: (question: string, hidden?: boolean) => Promise<string>;
+  readInputFile: (path: string, maxBytes: number) => Promise<Uint8Array>;
+  readStandardInput: (maxBytes: number) => Promise<Uint8Array>;
   output: {
     stdout: (value: string) => void;
     stderr: (value: string) => void;
@@ -37,6 +42,8 @@ export function defaultDependencies(
     version,
     fetch: globalThis.fetch,
     prompt,
+    readInputFile: readBoundedFile,
+    readStandardInput: readBoundedStdin,
     output: {
       stdout: (value) => process.stdout.write(`${value}\n`),
       stderr: (value) => process.stderr.write(`${value}\n`),
@@ -46,17 +53,34 @@ export function defaultDependencies(
 
 export async function runCli(argv: string[], dependencies: RuntimeDependencies): Promise<number> {
   try {
-    if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
-      dependencies.output.stdout(helpText());
+    const helpIndex = argv.findIndex((token) => token === '--help' || token === '-h');
+    if (argv.length === 0 || helpIndex !== -1) {
+      const scope = helpIndex === -1 ? [] : argv.slice(0, helpIndex);
+      dependencies.output.stdout(helpText(scope));
       return 0;
     }
     if (argv[0] === '--version' || argv[0] === '-v') {
       dependencies.output.stdout(dependencies.version);
       return 0;
     }
+    if (argv[0] === '--skill') {
+      dependencies.output.stdout(skillOutput(argv.slice(1)));
+      return 0;
+    }
     if (argv[0] === 'configure') return await runConfigure(argv.slice(1), dependencies);
 
     const request = buildRequest(commandCatalog, argv);
+    await materializeFileInput(request, dependencies);
+    for (const warning of request.warnings ?? []) dependencies.output.stderr(`Warning: ${warning}`);
+    if (request.dryRun) {
+      dependencies.output.stdout(JSON.stringify({
+        method: request.method,
+        path: request.path,
+        query: request.query,
+        ...(request.body === undefined ? {} : { body: request.body }),
+      }, null, 2));
+      return 0;
+    }
     const credentials = await resolveCredentials(dependencies);
     const client = createClient(credentials, dependencies);
     await resolveTimerIfNeeded(request, client);
@@ -67,16 +91,84 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
         return 0;
       }
     }
-    const result = await client.request(request.method, request.path, {
-      query: request.query,
-      ...(request.body === undefined ? {} : { body: request.body }),
-    });
+    const result = request.all
+      ? await requestAllPages(client, request)
+      : await client.request(request.method, request.path, {
+        query: request.query,
+        ...(request.body === undefined ? {} : { body: request.body }),
+      });
     dependencies.output.stdout(formatOutput(result, request.output));
     return 0;
   } catch (error) {
     dependencies.output.stderr(publicErrorMessage(error));
     return error instanceof CliError ? error.exitCode : 1;
   }
+}
+
+async function materializeFileInput(
+  request: CommandRequest,
+  dependencies: RuntimeDependencies,
+): Promise<void> {
+  if (!request.fileInput) return;
+  const input = request.fileInput.path
+    ? await dependencies.readInputFile(request.fileInput.path, request.fileInput.maxBytes)
+    : await dependencies.readStandardInput(request.fileInput.maxBytes);
+  const tickets = parseTicketImport(
+    input,
+    request.fileInput.format,
+    request.fileInput.maxBytes,
+    request.fileInput.maxItems,
+  );
+  request.body = { ...request.body, [request.fileInput.bodyName]: tickets };
+}
+
+async function requestAllPages(client: ApiClient, request: CommandRequest): Promise<unknown> {
+  const requestedLimit = request.query.limit;
+  const limit = typeof requestedLimit === 'number' ? requestedLimit : 100;
+  const combined: unknown[] = [];
+  let firstResponse: unknown;
+
+  for (let page = 1; page <= 1000; page += 1) {
+    const response = await client.request(request.method, request.path, {
+      query: { ...request.query, page, limit },
+    });
+    if (page === 1) firstResponse = response;
+    const items = extractList(response);
+    combined.push(...items);
+    const totalPages = extractTotalPages(response);
+    if (totalPages !== undefined ? page >= totalPages : items.length < limit) {
+      return combinePages(firstResponse, combined);
+    }
+  }
+  throw new ValidationError('Pagination exceeded the 1000-page safety limit.');
+}
+
+function extractTotalPages(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const pagination = record.pagination
+    ?? (record.meta && typeof record.meta === 'object'
+      ? (record.meta as Record<string, unknown>).pagination
+      : undefined);
+  if (!pagination || typeof pagination !== 'object') return undefined;
+  const totalPages = (pagination as Record<string, unknown>).totalPages;
+  return typeof totalPages === 'number' && Number.isSafeInteger(totalPages) && totalPages > 0
+    ? totalPages
+    : undefined;
+}
+
+function combinePages(firstResponse: unknown, data: unknown[]): unknown {
+  if (Array.isArray(firstResponse)) return data;
+  if (!firstResponse || typeof firstResponse !== 'object') return data;
+  const record = firstResponse as Record<string, unknown>;
+  const pagination = record.pagination && typeof record.pagination === 'object'
+    ? record.pagination as Record<string, unknown>
+    : {};
+  return {
+    ...record,
+    data,
+    pagination: { ...pagination, page: 1, total: data.length, totalPages: 1, all: true },
+  };
 }
 
 async function runConfigure(argv: string[], dependencies: RuntimeDependencies): Promise<number> {
@@ -155,7 +247,10 @@ async function resolveTimerIfNeeded(request: CommandRequest, client: ApiClient):
   if (typeof timerId !== 'string' || !timerId) {
     throw new ValidationError('The eligible timer response did not contain a usable id.');
   }
-  request.path = request.path.replace(`:${positional}`, encodeURIComponent(timerId));
+  request.path = request.path.replace(
+    `:${request.timerEligibility.pathParam ?? positional}`,
+    encodeURIComponent(timerId),
+  );
 }
 
 function extractList(value: unknown): unknown[] {

@@ -1,4 +1,9 @@
 export function formatOutput(value, format) {
+    if (format === 'raw') {
+        if (typeof value === 'string')
+            return value;
+        return JSON.stringify(value ?? null);
+    }
     if (format === 'json')
         return JSON.stringify(value ?? null, null, 2);
     if (value === undefined)

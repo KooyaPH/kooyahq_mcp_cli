@@ -116,6 +116,21 @@ test('retries transient GET transport failures before surfacing a network error'
   assert.equal(calls, 3);
 });
 
+test('bounds failed GET requests to three total transport attempts', async () => {
+  let calls = 0;
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0', retryDelayMs: 1,
+    fetch: async () => {
+      calls += 1;
+      throw new Error('temporary timeout');
+    },
+  });
+
+  await assert.rejects(client.request('GET', '/projects'), /Unable to reach/);
+  assert.equal(calls, 3);
+});
+
 test('does not retry non-GET transport failures', async () => {
   let calls = 0;
   const client = new ApiClient({
@@ -144,6 +159,22 @@ test('rejects oversized responses before parsing JSON', async () => {
   });
 
   await assert.rejects(client.request('GET', '/projects'), /too large/);
+});
+
+test('returns bounded text responses for explicit export commands', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0',
+    fetch: async () => new Response('name,email\nUser,user@example.com', {
+      status: 200,
+      headers: { 'content-type': 'text/csv' },
+    }),
+  });
+
+  assert.equal(
+    await client.request('GET', '/users/export', { query: { format: 'csv' } }),
+    'name,email\nUser,user@example.com',
+  );
 });
 
 test('extracts nested API error messages safely', async () => {

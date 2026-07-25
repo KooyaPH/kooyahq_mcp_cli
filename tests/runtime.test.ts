@@ -17,6 +17,12 @@ function dependencies(overrides: Partial<RuntimeDependencies> = {}): RuntimeDepe
       throw new Error('network must not be called');
     },
     prompt: async () => '',
+    readInputFile: async () => {
+      throw new Error('file input must not be read');
+    },
+    readStandardInput: async () => {
+      throw new Error('standard input must not be read');
+    },
     output: { stdout: () => undefined, stderr: () => undefined },
     ...overrides,
   };
@@ -35,6 +41,211 @@ test('does not send network traffic when credentials are missing', async () => {
   assert.equal(code, 2);
   assert.equal(networkCalls, 0);
   assert.match(errors.join('\n'), /configure/);
+});
+
+test('renders command help before configuration without sending network traffic', async () => {
+  let networkCalls = 0;
+  const lines: string[] = [];
+  const code = await runCli(['tickets', 'create', '--help'], dependencies({
+    fetch: async () => {
+      networkCalls += 1;
+      return new Response('{}');
+    },
+    output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+  }));
+
+  assert.equal(code, 0);
+  assert.equal(networkCalls, 0);
+  assert.match(lines.join('\n'), /tickets create/);
+  assert.match(lines.join('\n'), /--board-id/);
+  assert.match(lines.join('\n'), /--ticket-type/);
+  assert.match(lines.join('\n'), /Summary:/);
+  assert.match(lines.join('\n'), /Workflow:/);
+  assert.match(lines.join('\n'), /Examples:/);
+  assert.match(lines.join('\n'), /Exactly one:/);
+  assert.doesNotMatch(lines.join('\n'), /secret-access-key/i);
+});
+
+test('root and group help list every matching command with a concise summary', async () => {
+  for (const argv of [['--help'], ['tickets', '--help']]) {
+    const lines: string[] = [];
+    const code = await runCli(argv, dependencies({
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }));
+    assert.equal(code, 0);
+    const output = lines.join('\n');
+    assert.match(output, /tickets create\s{2,}/);
+    assert.match(output, /Create/i);
+  }
+});
+
+test('renders an agent-readable command skill without configuration or network traffic', async () => {
+  let networkCalls = 0;
+  const lines: string[] = [];
+  const code = await runCli(['--skill', 'tickets', 'create'], dependencies({
+    fetch: async () => {
+      networkCalls += 1;
+      return new Response('{}');
+    },
+    output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+  }));
+
+  assert.equal(code, 0);
+  assert.equal(networkCalls, 0);
+  assert.match(lines.join('\n'), /^# KooyaHQ CLI Skill/m);
+  assert.match(lines.join('\n'), /Command: `tickets create`/);
+  assert.match(lines.join('\n'), /Authentication/);
+  assert.match(lines.join('\n'), /--board-id/);
+  assert.match(lines.join('\n'), /--ticket-type/);
+  assert.match(lines.join('\n'), /epic\|story\|task\|bug\|subtask/);
+  assert.doesNotMatch(lines.join('\n'), /secret-access-key/i);
+});
+
+test('renders the command skill as stable JSON for automation', async () => {
+  const lines: string[] = [];
+  const code = await runCli(
+    ['--skill', 'tickets', 'create', '--output', 'json'],
+    dependencies({
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }),
+  );
+
+  assert.equal(code, 0);
+  const document = JSON.parse(lines.join('\n'));
+  assert.equal(document.schemaVersion, 1);
+  assert.equal(document.command, 'tickets create');
+  assert.equal(document.method, 'POST');
+  assert.equal(typeof document.summary, 'string');
+  assert.equal(typeof document.workflow, 'string');
+  assert.ok(Array.isArray(document.examples));
+  assert.equal(document.authentication.required, true);
+  assert.deepEqual(
+    document.parameters.find((parameter: { name: string }) => parameter.name === 'ticket-type').choices,
+    ['epic', 'story', 'task', 'bug', 'subtask'],
+  );
+  assert.equal(
+    document.parameters.find((parameter: { name: string }) => parameter.name === 'board-id').required,
+    true,
+  );
+  assert.doesNotMatch(lines.join('\n'), /secretAccessKey|secret-access-key/i);
+});
+
+test('renders root and group skills as command discovery documents', async () => {
+  for (const argv of [
+    ['--skill', '--output', 'json'],
+    ['--skill', 'tickets', '--output', 'json'],
+  ]) {
+    const lines: string[] = [];
+    const code = await runCli(argv, dependencies({
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }));
+    assert.equal(code, 0);
+    const document = JSON.parse(lines.join('\n'));
+    assert.equal(document.schemaVersion, 1);
+    assert.ok(Array.isArray(document.commands));
+    assert.ok(document.commands.some((command: { name: string }) => command.name === 'tickets create'));
+    assert.equal(typeof document.workflow, 'string');
+  }
+});
+
+test('prints a mutation dry run before configuration without sending network traffic', async () => {
+  let networkCalls = 0;
+  const lines: string[] = [];
+  const code = await runCli([
+    'tickets', 'create',
+    '--board-id', 'board-1',
+    '--ticket-type', 'task',
+    '--title', 'Release',
+    '--dry-run',
+    '--output', 'json',
+  ], dependencies({
+    fetch: async () => {
+      networkCalls += 1;
+      return new Response('{}');
+    },
+    output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+  }));
+
+  assert.equal(code, 0);
+  assert.equal(networkCalls, 0);
+  assert.deepEqual(JSON.parse(lines.join('\n')), {
+    method: 'POST',
+    path: '/tickets',
+    query: {},
+    body: {
+      boardId: 'board-1',
+      ticketType: 'task',
+      title: 'Release',
+    },
+  });
+});
+
+test('fetches every page for a paginated list only when --all is explicit', async () => {
+  const requestedPages: string[] = [];
+  const lines: string[] = [];
+  const code = await runCli(
+    ['projects', 'list', '--all', '--limit', '2', '--output', 'json'],
+    dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      fetch: async (input) => {
+        const url = new URL(String(input));
+        const page = url.searchParams.get('page') ?? '1';
+        requestedPages.push(page);
+        const data = page === '1' ? [{ id: 'p1' }, { id: 'p2' }] : [{ id: 'p3' }];
+        return new Response(JSON.stringify({
+          data,
+          pagination: { page: Number(page), limit: 2, total: 3, totalPages: 2 },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }),
+  );
+
+  assert.equal(code, 0);
+  assert.deepEqual(requestedPages, ['1', '2']);
+  assert.deepEqual(JSON.parse(lines.join('\n')).data, [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }]);
+});
+
+test('loads a bounded JSON ticket import file before sending a preview request', async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  const code = await runCli([
+    'tickets', 'import', 'preview',
+    '--board-id', 'board-1',
+    '--file', 'tickets.json',
+    '--format', 'json',
+    '--output', 'json',
+  ], dependencies({
+    environment: {
+      KOOYAHQ_BASE_URL: 'https://example.com',
+      KOOYAHQ_ACCESS_KEY_ID: 'id',
+      KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+    },
+    readInputFile: async () => Buffer.from(JSON.stringify([
+      { title: 'Release', ticketType: 'task' },
+    ])),
+    fetch: async (input, init) => {
+      requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({ data: { valid: 1 } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  } as Partial<RuntimeDependencies> & {
+    readInputFile: (path: string) => Promise<Buffer>;
+  }));
+
+  assert.equal(code, 0);
+  assert.deepEqual(requests, [{
+    url: 'https://example.com/api/cli/v1/tickets/import/preview',
+    body: {
+      boardId: 'board-1',
+      tickets: [{ title: 'Release', ticketType: 'task' }],
+    },
+  }]);
 });
 
 test('maps API status failures to stable exit codes without exposing credentials', async () => {

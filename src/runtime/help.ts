@@ -1,20 +1,140 @@
 import { commandCatalog } from '../commands/catalog.js';
+import {
+  commandDocumentation,
+  commandSummary,
+  optionConstraints,
+  optionValueLabel,
+  workflowFor,
+} from '../commands/documentation.js';
+import type { CommandSpec, OptionSpec } from '../commands/types.js';
 
-export function helpText(): string {
-  const commands = commandCatalog.map((command) => `  ${command.name}`).sort().join('\n');
+export function helpText(scope: string[] = []): string {
+  if (scope.length > 0) {
+    const name = scope.join(' ');
+    const command = commandCatalog.find((candidate) => candidate.name === name);
+    if (command) return commandHelp(command);
+
+    const commands = commandCatalog.filter((candidate) => candidate.name.startsWith(`${name} `));
+    if (commands.length > 0) {
+      return `KooyaHQ ${name} commands
+
+Usage:
+  kooyahq ${name} <command> [options]
+
+Workflow:
+  ${workflowFor(scope[0]!)}
+
+Commands:
+${commandList(commands)}
+
+Run \`kooyahq ${name} <command> --help\` for exact parameters, enums, constraints, and examples.`;
+    }
+  }
+
   return `KooyaHQ internal command-line client
 
 Usage:
   kooyahq configure
   kooyahq configure show|clear
   kooyahq <command> [arguments] [options]
+  kooyahq --skill [group] [command] [--output markdown|json]
 
 Commands:
-${commands}
+${commandList(commandCatalog)}
 
-List options:
-  --page <n> --limit <n> --sort <field> --order <asc|desc>
-  --output <table|json>
+Global behavior:
+  --output <table|json|raw>  Select tabular, structured, or unmodified text output.
+  --dry-run              Validate and print a request without credentials or network traffic.
+  --all                  Fetch every page for a paginated GET command.
+  --yes                  Skip confirmation only where a command documents it.
+  --help                 Show offline help without reading configuration.
 
-Run a command with only allowlisted flags. Destructive commands prompt unless --yes is supplied.`;
+Authentication and authorization are enforced by the backend for every request. Mutations are never retried automatically.`;
+}
+
+function commandHelp(command: CommandSpec): string {
+  const documentation = commandDocumentation(command);
+  const positionals = (command.positionals ?? [])
+    .map((positional) => positional.optional ? `[${positional.name}]` : `<${positional.name}>`)
+    .join(' ');
+  const usage = ['kooyahq', command.name, positionals, '[options]'].filter(Boolean).join(' ');
+  const definitions = { ...command.pathParams, ...command.query, ...command.body };
+  const options = Object.entries(definitions)
+    .map(([name, definition]) => formatOption(
+      name,
+      definition,
+      command.requiredOptions?.includes(name) ?? false,
+      command.exactlyOne?.some((group) => group.includes(name)) ?? false,
+    ));
+  options.push('  --output <table|json|raw>  Output format; raw is intended for exports.');
+  options.push('  --dry-run              Validate and print the request without authentication or network traffic.');
+  if (command.query?.page && command.query.limit) {
+    options.push('  --all                  Fetch every page sequentially.');
+  }
+  if (command.confirmation) options.push('  --yes                  Skip the documented confirmation prompt.');
+  if (command.fileInput) {
+    options.push('  --file <path>           Read a bounded import file (exclusive with --stdin).');
+    options.push('  --stdin                 Read bounded import input from standard input (exclusive with --file).');
+    options.push('  --format <json|csv>     Override file-extension format detection.');
+  }
+  options.push('  --help                 Show this help without reading configuration.');
+
+  const groups = [
+    ...(command.exactlyOne ?? []).map((group) => `  Exactly one: ${group.map(flag).join(', ')}`),
+    ...(command.atMostOne ?? []).map((group) => `  At most one: ${group.map(flag).join(', ')}`),
+    ...(command.conditionalRequirements ?? []).map(
+      (rule) => `  Conditional: --${rule.option} requires --${rule.requires} ${rule.value}`,
+    ),
+    ...(command.pairedOptions ?? []).map(
+      (group) => `  Together: ${group.map(flag).join(', ')}`,
+    ),
+  ];
+  const deprecated = (command.positionals ?? [])
+    .filter((positional) => positional.deprecated && positional.aliasFor)
+    .map((positional) => `  <${positional.name}> is deprecated; use --${positional.aliasFor}.`);
+
+  return `KooyaHQ command: ${command.name}
+
+Summary:
+  ${documentation.summary}
+
+Workflow:
+  ${documentation.workflow}
+
+Usage:
+  ${usage}
+
+Options:
+${options.join('\n')}
+${groups.length > 0 ? `\nRelationships:\n${groups.join('\n')}\n` : ''}${deprecated.length > 0 ? `\nCompatibility:\n${deprecated.join('\n')}\n` : ''}
+Examples:
+${documentation.examples.map((example) => `  ${example}`).join('\n')}
+
+Security:
+  The backend authorizes the acting access-key owner for every resource. This command cannot bypass board, team, or administrator permissions.`;
+}
+
+function commandList(commands: CommandSpec[]): string {
+  const names = commands.map((command) => command.name);
+  const width = Math.max(...names.map((name) => name.length)) + 2;
+  return [...commands]
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((command) => `  ${command.name.padEnd(width)}${commandSummary(command)}`)
+    .join('\n');
+}
+
+function formatOption(
+  name: string,
+  definition: OptionSpec,
+  required: boolean,
+  oneOf: boolean,
+): string {
+  const value = optionValueLabel(definition);
+  const requirement = required ? 'required' : oneOf ? 'required group' : '';
+  const details = [requirement, ...optionConstraints(definition)].filter(Boolean);
+  return `  --${name}${value ? ` ${value}` : ''}${details.length > 0 ? `  (${details.join('; ')})` : ''}`;
+}
+
+function flag(value: string): string {
+  return `--${value}`;
 }

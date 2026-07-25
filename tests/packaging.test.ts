@@ -9,6 +9,7 @@ const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
 };
 
 const readme = readFileSync('README.md', 'utf8');
+const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
@@ -23,8 +24,18 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /npm install -g --install-links=true git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
   assert.match(readme, /npm uninstall -g kooyahq-cli/);
   assert.match(readme, /hash -r/);
-  assert.match(readme, /ENOTEMPTY/);
-  assert.match(readme, /ENOTDIR/);
   assert.match(readme, /tsc: not found/);
   assert.match(readme, /kooyahq auth whoami/);
+  assert.match(readme, /kooyahq --skill tickets create/);
+  assert.match(readme, /Windows/);
+  assert.match(readme, /macOS/);
+  assert.doesNotMatch(readme, /global_prefix|globalPrefix|packagePath|binPath/);
+});
+
+test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () => {
+  assert.match(workflow, /git diff --exit-code -- dist/);
+  assert.match(workflow, /ubuntu-latest/);
+  assert.match(workflow, /macos-latest/);
+  assert.match(workflow, /windows-latest/);
+  assert.match(workflow, /kooyahq\.js --skill/);
 });

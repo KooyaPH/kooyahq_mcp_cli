@@ -5,6 +5,8 @@ export interface RuntimeDependencies {
     version: string;
     fetch: typeof globalThis.fetch;
     prompt: (question: string, hidden?: boolean) => Promise<string>;
+    readInputFile: (path: string, maxBytes: number) => Promise<Uint8Array>;
+    readStandardInput: (maxBytes: number) => Promise<Uint8Array>;
     output: {
         stdout: (value: string) => void;
         stderr: (value: string) => void;

@@ -1,6 +1,10 @@
 import type { OutputFormat } from '../commands/types.js';
 
 export function formatOutput(value: unknown, format: OutputFormat): string {
+  if (format === 'raw') {
+    if (typeof value === 'string') return value;
+    return JSON.stringify(value ?? null);
+  }
   if (format === 'json') return JSON.stringify(value ?? null, null, 2);
   if (value === undefined) return 'Success.';
   const rows = extractRows(value);

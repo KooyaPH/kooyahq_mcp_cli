@@ -1,1 +1,1 @@
-export declare function helpText(): string;
+export declare function helpText(scope?: string[]): string;

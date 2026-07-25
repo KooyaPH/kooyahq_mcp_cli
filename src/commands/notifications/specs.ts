@@ -6,4 +6,12 @@ export const notificationCommands: CommandSpec[] = [
     'unread-only': { apiName: 'unreadOnly', type: 'boolean' },
   }) },
   { name: 'notifications count', method: 'GET', path: '/notifications/count' },
+  {
+    name: 'notifications mark-read',
+    method: 'PATCH',
+    path: '/notifications/:notificationId/read',
+    pathParams: { 'notification-id': { apiName: 'notificationId' } },
+    requiredOptions: ['notification-id'],
+  },
+  { name: 'notifications mark-all-read', method: 'PATCH', path: '/notifications/read-all' },
 ];

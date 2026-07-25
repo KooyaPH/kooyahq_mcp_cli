@@ -1,19 +1,26 @@
 # KooyaHQ CLI
 
-Private command-line access to the KooyaHQ API for authenticated KooyaHQ operators. The CLI targets `https://hq-be.kooyaai.com/api/cli/v1` by default and requires Node.js 18 or newer.
+Private, authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, and notifications. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
 
-This package is private and is not published to npmjs.com. Install it from the private GitHub repository. There is no npm package publication and no release-tag requirement for internal installs.
+The repository is private, the package is not published to npmjs.com, and Node.js 18 or newer is required. GitHub access is required to install it.
 
-## Install from GitHub
+## Install
 
-You need read access to `KooyaPH/kooyahq_cli`, Node.js 18 or newer, npm, Git, and a GitHub-authenticated SSH key. Confirm access before installing:
+Prerequisites:
+
+- Node.js 18 or newer and npm
+- Git and SSH
+- Read access to `KooyaPH/kooyahq_cli`
+- A GitHub SSH key available to the current shell
+
+Confirm repository access:
 
 ```sh
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 ```
 
-Install from `main`:
+### Linux and macOS
 
 ```sh
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
@@ -22,61 +29,49 @@ kooyahq --version
 kooyahq --help
 ```
 
-`--install-links=true` is required for private GitHub installs. Without it, npm can leave `kooyahq-cli` as a dangling symlink into its temporary Git cache on some npm versions. `hash -r` refreshes the current shell's command lookup after installation. The GitHub package ships compiled `dist/` files on `main`. During installation npm runs a dependency-free package check against those committed files; it does not compile TypeScript on your machine. To remove it:
+### Windows
+
+Run in PowerShell with Git for Windows and Node.js installed:
+
+```powershell
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+kooyahq --version
+kooyahq --help
+```
+
+The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout. To uninstall:
 
 ```sh
 npm uninstall -g kooyahq-cli
 ```
 
-There is deliberately no npm publication or deployment workflow.
-
-### Windows
-
-Use PowerShell, Git for Windows, and Node.js 18 or newer:
-
-```powershell
-ssh -T git@github.com
-git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
-kooyahq --version
-kooyahq --help
-```
-
-Configuration is stored at `%USERPROFILE%\.kooyahq\config.json`. On Windows, the CLI applies private ACLs with `whoami` and `icacls` without invoking a shell; only the current account and `SYSTEM` are granted access.
-
-### macOS and Linux
-
-Use a POSIX shell, Git, OpenSSH, and Node.js 18 or newer:
-
-```sh
-ssh -T git@github.com
-git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
-hash -r
-kooyahq --version
-kooyahq --help
-```
-
-Configuration is stored at `~/.kooyahq/config.json`. The directory is set to `0700`, the config file is set to `0600`, and writes use a temporary file in the same directory followed by an atomic rename.
-
 ## Configure
 
-Interactive configuration validates the credentials with `auth whoami` before saving them. The secret uses a hidden prompt and is never accepted as a command-line flag.
+Create an access key from the signed-in user's KooyaHQ profile. Each user can own at most one active CLI key, sees the secret only when it is created, and can revoke or replace only their own key.
+
+Run the interactive configuration:
 
 ```sh
 kooyahq configure
+kooyahq auth whoami --output json
+```
+
+Configuration validates the key against the backend before saving. The secret is entered through a hidden prompt and is never accepted as a command-line flag. Useful configuration commands:
+
+```sh
 kooyahq configure show
 kooyahq configure clear
 ```
 
-`configure show` always prints the secret as `[REDACTED]`. A failed validation leaves the prior configuration untouched. Configuration is stored at:
+`configure show` always redacts the secret. Failed validation does not overwrite an existing configuration.
 
-- POSIX: `~/.kooyahq/config.json`
-- Windows: `%USERPROFILE%\.kooyahq\config.json`
+Configuration locations and protections:
 
-On POSIX, the directory and file are created with modes `0700` and `0600`. On Windows, inheritance is removed and access is restricted to the current account plus `SYSTEM`. Writes use a temporary file in the same directory followed by an atomic rename.
+- Linux/macOS: `~/.kooyahq/config.json`, directory mode `0700`, file mode `0600`
+- Windows: `%USERPROFILE%\.kooyahq\config.json`, private ACL for the current account and `SYSTEM`
+- Writes use a same-directory temporary file and atomic rename
 
-For non-interactive use, all three variables must be set together. They override the stored configuration as one complete set:
+For non-interactive jobs, set all three variables together. A blank or partial set fails before any request is sent:
 
 ```sh
 export KOOYAHQ_BASE_URL=https://hq-be.kooyaai.com
@@ -85,11 +80,30 @@ export KOOYAHQ_SECRET_ACCESS_KEY=your-secret-access-key
 kooyahq auth whoami --output json
 ```
 
-The base URL must be an HTTPS origin with no path, user information, query, or fragment. Plain HTTP is accepted only for `localhost`, `127.0.0.1`, or `::1`. Missing, blank, or partial credentials stop before any network request.
+The base URL must be an HTTPS origin without a path, query, fragment, or embedded credentials. Plain HTTP is allowed only for localhost development.
+
+## Offline help and agent discovery
+
+Help and skill discovery run before configuration and never send network traffic:
+
+```sh
+kooyahq --help
+kooyahq tickets --help
+kooyahq tickets create --help
+
+kooyahq --skill
+kooyahq --skill tickets
+kooyahq --skill tickets create
+kooyahq --skill tickets create --output json
+```
+
+Command help includes the workflow, exact flags, enum values, required groups, conditional parameters, compatibility aliases, examples, and security behavior. `--skill ... --output json` is a stable, machine-readable command contract intended for automation and AI tools.
+
+Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
 
 ## Command catalog
 
-Arguments in angle brackets are positional IDs. Create and update commands require at least one documented data option.
+The catalog below is the supported frontend-parity surface. Run any command with `--help` for its exact parameters.
 
 ### Authentication and projects
 
@@ -97,153 +111,257 @@ Arguments in angle brackets are positional IDs. Create and update commands requi
 auth whoami
 
 projects list
-projects get <id>
+projects get
 projects create
-projects update <id>
-projects delete <id> [--yes]
+projects update
+projects delete
+projects keyword-migration preview
+projects keyword-migration apply
 ```
 
-Project create requires `--name`. Project update requires at least one data option. Project data options: `--name`, `--emoji`, `--icon-url`.
+Keyword migration reassigns time entries using the same keyword workflow as Project Management. Preview first; apply requires confirmation unless `--yes` is supplied.
 
 ### Boards
 
 ```text
 boards list
-boards get <id>
+boards get
 boards create
-boards update <id>
-boards delete <id> [--yes]
-boards favorite <id>
-boards settings get <id>
-boards settings update <id>
-boards members list <board-id>
-boards members add <board-id>
-boards members update-role <board-id> <user-id>
-boards members remove <board-id> <user-id> [--yes]
+boards update
+boards delete
+boards favorite
+boards favorite set
+boards favorite toggle
+boards activities list
+boards mentions list
+boards assignees list
+
+boards members list
+boards members add
+boards members update-role
+boards members remove
+
+boards columns list
+boards columns add
+boards columns update
+boards columns move
+boards columns remove
+
+boards settings get
+boards settings update
+boards settings fields list
+boards settings fields set
+boards settings fields reset
+
+boards automation list
+boards automation add
+boards automation update
+boards automation remove
 ```
 
-Board create requires `--name` and `--type`; it also accepts `--description`, `--prefix`, `--emoji`, `--columns-json` (a JSON array), and `--settings-json` (a JSON object). Board update accepts the same fields except `--type`. In the v1 contract, `--settings-json` is limited to `defaultView` and `showSwimlanes`. `boards favorite` toggles the current favorite state. Settings update accepts `--default-view` and `--show-swimlanes true|false`. Member add requires `--user-id` and `--role`; update-role requires `--role`.
+Boards can be selected by exact ID or key. Member, column, settings, favorite, and GitHub automation mutations require the same board access as the web application. Column moves use semantic `before`, `after`, `first`, or `last` placement. Removing an occupied column requires an explicit destination and is refused if the backend cannot guarantee an atomic migration.
 
-### Tickets and comments
+`boards favorite get` is represented by `boards get` and the favorite field in its response; the mutation commands are listed separately above.
+
+### Tickets, comments, and board work
 
 ```text
 tickets list
-tickets get <id>
+tickets search
+tickets assigned
+tickets get
+tickets detail
 tickets create
-tickets update <id>
-tickets delete <id> [--yes]
-tickets comments list <ticket-id>
-tickets comments create <ticket-id>
-tickets comments update <ticket-id> <comment-id>
-tickets comments delete <ticket-id> <comment-id> [--yes]
+tickets update
+tickets delete
+tickets move
+tickets archive
+tickets unarchive
+tickets improve
+tickets improve-draft
+tickets import preview
+tickets import apply
+tickets activities list
+tickets viewers list
+
+tickets comments list
+tickets comments create
+tickets comments update
+tickets comments delete
+
+tickets parent set
+tickets parent clear
+tickets epic set
+tickets epic clear
+tickets subtasks list
+
+tickets criteria list
+tickets criteria add
+tickets criteria set
+tickets criteria remove
+
+tickets documents list
+tickets documents add
+tickets documents remove
+
+tickets relations list
+tickets relations add
+tickets relations remove
+tickets blockers list
+tickets blockers add
+tickets blockers remove
+
+tickets development get
+tickets development set
+tickets development clear
 ```
 
-Ticket list requires `--board-id`. Ticket create requires `--board-id`, `--ticket-type`, and `--title`; it also accepts `--description-json` (a JSON object), `--column-id`, `--points`, `--priority`, comma-separated `--tags`, `--assignee-id`, `--acceptance-criteria-json` (a JSON array), `--start-date`, `--end-date`, and `--due-date`. Ticket update accepts the same mutable fields but excludes board ID and ticket type. The column ID is the ticket status column on its board. Comment create/update accepts `--content`.
+Ticket IDs and keys are exact selectors. Board-scoped list/create/import commands require exactly one board ID or board key. Ticket mutations cover the web application's lifecycle, comments, assignments, relationships, blockers, hierarchy, acceptance criteria, documents, and GitHub development data.
 
-### Time
+Ticket imports accept JSON or CSV from a file or standard input, never both:
+
+```sh
+kooyahq tickets import preview --board-key OPS --file tickets.csv
+kooyahq tickets import apply --board-key OPS --stdin --format json
+```
+
+Input must be UTF-8 and is limited to 5 MiB and 250 tickets. CSV headers are allowlisted. Quoted CSV fields and the frontend's flattened JSON fields are normalized locally.
+
+### Time tracking
 
 ```text
 time timers list
 time timers start
-time timers pause [timer-id]
-time timers resume [timer-id]
-time timers stop [timer-id]
-time timers stop-all [--yes]
-time timers add-task <timer-id>
+time timers start-many
+time timers pause
+time timers resume
+time timers stop
+time timers stop-all
+time timers add-task
 
 time entries list
-time entries get <id>
+time entries today
+time entries get
 time entries create
-time entries update <id>
-time entries delete <id> [--yes]
+time entries update
+time entries delete
+
+time workday status
+time workday summary
+time workday end
 ```
 
-Timer start requires one `--project` and accepts optional free-text `--task` and `--is-overtime true|false`; the project is sent as a one-element `projects` array. Add-task requires free-text `--task`. Time-entry create requires comma-separated `--projects`, `--task`, and `--duration`; it also accepts `--start-time`, `--end-time`, and `--is-overtime true|false`. Time-entry update accepts only `--projects`, `--task`, and `--duration`. User IDs are never accepted for time operations.
+Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. `start-many` accepts at most 20 unique projects. Team entry reads require `--scope team`, and `--user-id` is rejected without that explicit scope. The backend still checks the user's time-entry permission.
 
-Pause, resume, and stop accept an explicit timer ID. Without one, the CLI fetches the eligible timers (`running` for pause/stop, `paused` for resume) and proceeds only when exactly one is returned. Zero or multiple eligible timers is a validation error; the CLI never guesses. `stop-all` asks for confirmation unless `--yes` is present.
-
-### Analytics
+### Analytics and budgets
 
 ```text
 analytics time
 analytics team
 analytics projects
 analytics costs
+analytics costs live
+analytics costs projects list
+analytics costs projects get
+analytics costs forecast
+analytics costs compare
+analytics costs budgets list
+analytics costs budgets create
+analytics costs budgets update
+analytics costs budgets delete
+analytics costs budgets comparisons
 ```
 
-Analytics requires both `--start-date` and `--end-date`.
+Time, team, project, and cost summaries require explicit calendar dates and reject ranges longer than 366 days. Cost analytics and budget writes require their corresponding backend permissions. The CLI does not expose privileged salary/rate fields unless the backend route and acting user explicitly authorize them.
 
-### Users
+### Users and administrator views
 
 ```text
 users list
-users get <id>
+users get
 users create
-users update <id>
-users delete <id> [--yes]
+users update
+users delete
+users clients create
 users stats
-users permissions get <id>
-users permissions update <id>
+users activity list
+users export
+users permissions get
+users permissions update
 users templates list
-users templates get <id>
+users templates get
 ```
 
-User create requires `--name` and `--email`. User data options also include `--position`, `--birthday`, `--status`, comma-separated `--permissions`, and `--bio`. Update accepts those fields plus `--disabled true|false`. Permission updates accept a comma-separated `--permissions` value.
+`users list --all --output json` is the assignment-friendly user lookup. Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Use `users export --format csv --output raw` for a CSV stream.
 
 ### Notifications
 
 ```text
 notifications list
 notifications count
+notifications mark-read
+notifications mark-all-read
 ```
 
-Notification list accepts `--unread-only true|false`. Notification count has no filters.
+Notifications are always scoped to the authenticated user. Lists are paginated and support `--unread-only true|false`.
 
-## Lists, filters, and output
+## Common flags and scripting
 
-Every `list` command accepts:
+Paginated list commands support:
 
 ```text
 --page <positive-integer>
 --limit <positive-integer>
---sort <field>
+--sort <allowlisted-field>
 --order <asc|desc>
---output <table|json>
+--all
 ```
 
-Relevant allowlisted filters are:
+Global command behavior:
 
-| List | Filters |
-| --- | --- |
-| projects | `--search` |
-| boards | `--search`, `--type` |
-| board members | `--search`, `--role` |
-| tickets | required `--board-id`; optional `--search`, `--ticket-type`, `--column-id`, `--assignee-id`, `--priority`, `--archived` |
-| ticket comments | `--author-id` |
-| timers | `--status running|paused` |
-| time entries | `--project`, `--active`, `--paused`, `--start-date`, `--end-date` |
-| users | `--search`, `--include-disabled` |
-| user templates | `--search` |
-| notifications | `--unread-only` |
+- `--output table` is the human-readable default.
+- `--output json` preserves structured API responses.
+- `--output raw` is intended for text exports.
+- `--dry-run` validates and prints the request without reading credentials or sending traffic.
+- `--all` fetches paginated GET results sequentially, with a 1,000-page safety cap.
+- `--yes` skips a documented confirmation; it is rejected on commands that do not support it.
+- Mutations are never retried. GET transport failures are retried at most twice after the first attempt.
 
 Examples:
 
 ```sh
-kooyahq projects list --page 2 --limit 50 --sort name --order asc
-kooyahq tickets list --board-id board_123 --column-id column_456 --search "release review" --output json
-kooyahq tickets create --board-id board_123 --ticket-type task --title "Release" --tags release,urgent --description-json '{"type":"doc"}'
-kooyahq time timers start --project project_123 --task "Release review"
-kooyahq time entries list --project project_123 --start-date 2026-07-01 --end-date 2026-07-31 --output json
-kooyahq analytics time --start-date 2026-07-01 --end-date 2026-07-31 --output json
-kooyahq boards members update-role board_123 user_456 --role admin --output json
-kooyahq users permissions update user_456 --permissions projects:view,board:update
+kooyahq boards get --board-key OPS --output json
+kooyahq boards members add --board-key OPS --user-id user_123 --role member --dry-run
+kooyahq tickets list --board-key OPS --assignee-id user_123 --sort priority --order desc --all --output json
+kooyahq tickets create --board-key OPS --ticket-type task --title "Release" --assignee-id user_123 --dry-run
+kooyahq tickets blockers add --ticket-key OPS-42 --blocker-ticket-key OPS-12
+kooyahq time timers start-many --projects Project-A,Project-B --task "Review"
+kooyahq time entries list --scope team --user-id user_123 --start-date 2026-07-01 --end-date 2026-07-25 --output json
+kooyahq analytics team --start-date 2026-07-01 --end-date 2026-07-25 --output json
+kooyahq notifications list --unread-only true --all --output json
+kooyahq users list --search "Alex" --all --output json
 ```
 
-Options are converted with `URLSearchParams`; CLI `--sort` and `--order` map to API `sortBy` and `sortOrder`. Sort fields are allowlisted to common server fields: `createdAt`, `updatedAt`, `name`, `title`, `email`, `status`, `priority`, `duration`, `startTime`, `endTime`, and `occurredAt`. Unknown filters or unsupported sort fields are rejected instead of being sent to the API. JSON flags must parse to the documented object or array shape. Table output is the default. JSON output preserves the API response for scripting. Empty successful mutation responses print `Success.` in table mode.
+## Authorization, auditing, and security
 
-## Permissions and exit codes
+The CLI is a typed wrapper around HTTPS requests; it is not a permission bypass. Every request is authenticated by the backend and evaluated as the access-key owner. Board membership, board roles, time-entry scopes, user-management permissions, analytics permissions, and administrator permissions remain authoritative server-side.
 
-Access keys are scoped by the server. The CLI does not elevate access: authentication proves the key pair, while project, board, ticket, time, analytics, user, template, permission, and notification operations still require their corresponding server-side permissions.
+Accepted CLI requests are audited in KooyaHQ with the acting user, access-key ID, command/action, method and route, source IP, user agent, timestamp, status, and duration. Audit records do not store the request body, response body, or secret. CLI access audits use the dedicated administrator-log permission and the configured rolling retention window.
+
+Client security behavior:
+
+- No request is sent for blank or partial configuration.
+- Credentials are sent only to the validated origin with `Authorization: KooyaKey <id>:<secret>`.
+- Redirects are rejected so credentials cannot cross origins.
+- Requests time out after 30 seconds and response bodies are limited to 10 MiB.
+- Secrets are never printed by `configure show`, help, skills, or dry-run output.
+- Reflected credentials are redacted from API error messages.
+- Configuration uses private filesystem permissions and atomic writes.
+- Do not put secrets in shell history, tickets, chat, screenshots, repositories, or command flags.
+
+Revoke a compromised key in the user's KooyaHQ profile, remove it from CI/environment storage, and run `kooyahq configure clear`. Clearing the local file alone does not revoke the server-side key.
+
+## Exit codes
 
 | Code | Meaning |
 | --- | --- |
@@ -254,60 +372,26 @@ Access keys are scoped by the server. The CLI does not elevate access: authentic
 | `4` | Authorization failure (`403`) |
 | `5` | Not found or conflict (`404`/`409`) |
 
-## Security and revocation
-
-- Requests use `Authorization: KooyaKey <id>:<secret>` only over the validated origin and API root.
-- Redirect following is disabled, which prevents credentials crossing to another origin.
-- Requests have a 30-second timeout and responses are capped at 10 MiB before JSON parsing.
-- The CLI never logs credentials and redacts credentials if an API error reflects them.
-- Do not place secrets in shell history, tickets, chat, screenshots, or repository files. Prefer the hidden prompt or a protected CI secret store.
-- To revoke access, revoke/rotate the access key in KooyaHQ, run `kooyahq configure clear`, and remove any environment or CI secret values. Clearing the local file alone does not revoke a server-side key.
-
 ## Troubleshooting
 
-- `KooyaHQ is not configured`: run `kooyahq configure`, or set all three environment variables.
-- `must be set together`: remove partial environment variables or provide the complete set.
-- Exit `3`: the key is missing, expired, revoked, or copied incorrectly. Reissue it; do not paste it into diagnostics.
-- Exit `4`: the authenticated key lacks the required permission. Ask a KooyaHQ administrator to review its scope.
-- SSH install failure: verify repository membership, SSH-agent state, and `ssh -T git@github.com`.
-- `tsc: not found` during `npm install -g git+ssh://...`: update to the latest `main` and reinstall. Current GitHub installs use committed `dist/` files and do not require TypeScript on the target machine.
-- `TAR_ENTRY_ERROR ENOENT .../dist/...` followed by `kooyahq: command not found`, `ENOTDIR: not a directory, rename .../node_modules/kooyahq-cli`, or `ENOTEMPTY: directory not empty, rename .../node_modules/kooyahq-cli`: remove stale global symlinks, clear npm's cache index, and reinstall. On macOS/Linux with nvm:
+- `kooyahq: command not found` after a successful Linux/macOS install: run `hash -r`, then `kooyahq --version`.
+- `tsc: not found` during installation: fetch the current `main` and reinstall. Supported GitHub installs use committed `dist/` files and do not compile TypeScript.
+- SSH or repository error: verify `ssh -T git@github.com` and `git ls-remote git@github.com:KooyaPH/kooyahq_cli.git`.
+- `KooyaHQ is not configured`: run `kooyahq configure` or provide all three environment variables.
+- Exit `3`: the key is invalid, revoked, expired, or copied incorrectly.
+- Exit `4`: the acting user lacks the required backend permission or resource membership.
+- Timer ambiguity: run `kooyahq time timers list --output json`, then pass `--timer-id` explicitly.
+- TLS/network failure: verify the configured origin and corporate proxy/firewall. Redirects are intentionally rejected.
 
-  ```sh
-  npm uninstall -g kooyahq-cli || true
-  global_prefix="$(npm prefix -g)"
-  package_path="$global_prefix/lib/node_modules/kooyahq-cli"
-  bin_path="$global_prefix/bin/kooyahq"
-  test -L "$bin_path" && unlink "$bin_path"
-  test -L "$package_path" && unlink "$package_path"
-  if [ -e "$package_path" ]; then
-    echo "Refusing to remove non-symlink package path: $package_path"
-    exit 1
-  fi
-  npm cache verify
-  npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
-  hash -r
-  kooyahq --version
-  ```
+## Development and CI
 
-  In Windows PowerShell:
+```sh
+npm ci
+npm test
+npm run typecheck
+npm run build
+git diff --exit-code -- dist
+npm audit --omit=dev
+```
 
-  ```powershell
-  npm uninstall -g kooyahq-cli
-  $globalPrefix = npm prefix -g
-  $globalModules = npm root -g
-  $packagePath = Join-Path $globalModules 'kooyahq-cli'
-  $binPath = Join-Path $globalPrefix 'kooyahq.cmd'
-  Remove-Item -Force $binPath -ErrorAction SilentlyContinue
-  if ((Test-Path $packagePath) -and ((Get-Item $packagePath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-    Remove-Item -Force $packagePath
-  }
-  if (Test-Path $packagePath) {
-    throw "Refusing to remove non-symlink package path: $packagePath"
-  }
-  npm cache verify
-  npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
-  kooyahq --version
-  ```
-- TLS/network failure: check the configured origin and corporate proxy/firewall. Redirects are intentionally rejected.
-- Timer ambiguity: rerun `time timers list --output json`, then supply the intended timer ID explicitly.
+CI verifies Node.js 18, 20, 22, and 24 on Linux, checks that committed `dist/` matches the TypeScript source, packs and installs the artifact, and smoke-tests Linux, macOS, and Windows. The repository has no npm publication or deployment workflow.

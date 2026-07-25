@@ -4,7 +4,7 @@ import { validateBaseUrl } from '../config/url.js';
 export const API_ROOT = '/api/cli/v1';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
-const DEFAULT_GET_RETRIES = 9;
+const DEFAULT_GET_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 250;
 export class ApiClient {
     options;
@@ -37,8 +37,7 @@ export class ApiClient {
             authorization: `KooyaKey ${this.options.accessKeyId}:${this.options.secretAccessKey}`,
             'user-agent': `kooyahq-cli/${this.options.version} (${this.platform}; node/${this.nodeVersion})`,
         });
-        const controller = new AbortController();
-        const init = { method, headers, redirect: 'error', signal: controller.signal };
+        const init = { method, headers, redirect: 'error' };
         if (requestOptions.body !== undefined) {
             headers.set('content-type', 'application/json');
             init.body = JSON.stringify(requestOptions.body);
@@ -138,9 +137,8 @@ async function parseResponse(response, maxResponseBytes) {
     }
     if (!text)
         return undefined;
-    if (!(response.headers.get('content-type') ?? '').toLowerCase().includes('application/json')) {
-        return undefined;
-    }
+    if (!(response.headers.get('content-type') ?? '').toLowerCase().includes('application/json'))
+        return text;
     try {
         return JSON.parse(text);
     }
