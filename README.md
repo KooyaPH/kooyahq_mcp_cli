@@ -13,7 +13,7 @@ ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 ```
 
-Install or update from `main`:
+Install from `main`:
 
 ```sh
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
