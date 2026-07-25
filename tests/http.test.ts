@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import type { Socket } from 'node:net';
 import test from 'node:test';
 
 import { ApiClient, buildHttpsRequestOptions } from '../src/http/client.js';
@@ -14,6 +16,61 @@ test('default HTTPS transport forces IPv4 DNS lookup for backend requests', () =
   assert.equal(options.family, 4);
   assert.equal(options.servername, 'hq-be.kooyaai.com');
   assert.equal(options.path, '/api/cli/v1/projects?limit=1');
+});
+
+test('default transport supports an allowed HTTP localhost origin', async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"ok":true}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    const client = new ApiClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+      version: '1.0.0',
+      retryDelayMs: 1,
+    });
+    assert.deepEqual(await client.request('GET', '/whoami'), { ok: true });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('native transport destroys timed-out sockets and bounds GET retries', async () => {
+  let requests = 0;
+  const openSockets = new Set<Socket>();
+  const server = createServer(() => {
+    requests += 1;
+  });
+  server.on('connection', (socket) => {
+    openSockets.add(socket);
+    socket.on('close', () => openSockets.delete(socket));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    const client = new ApiClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+      version: '1.0.0',
+      timeoutMs: 15,
+      retryDelayMs: 1,
+    });
+
+    await assert.rejects(client.request('GET', '/projects'), /Unable to reach/);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.ok(requests >= 1 && requests <= 3, `observed ${requests} native requests`);
+    assert.equal(openSockets.size, 0);
+  } finally {
+    for (const socket of openSockets) socket.destroy();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 test('sends the exact authorization and user-agent headers and rejects redirects', async () => {
@@ -116,6 +173,21 @@ test('retries transient GET transport failures before surfacing a network error'
   assert.equal(calls, 3);
 });
 
+test('bounds failed GET requests to three total transport attempts', async () => {
+  let calls = 0;
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0', retryDelayMs: 1,
+    fetch: async () => {
+      calls += 1;
+      throw new Error('temporary timeout');
+    },
+  });
+
+  await assert.rejects(client.request('GET', '/projects'), /Unable to reach/);
+  assert.equal(calls, 3);
+});
+
 test('does not retry non-GET transport failures', async () => {
   let calls = 0;
   const client = new ApiClient({
@@ -144,6 +216,35 @@ test('rejects oversized responses before parsing JSON', async () => {
   });
 
   await assert.rejects(client.request('GET', '/projects'), /too large/);
+});
+
+test('returns bounded text responses for explicit export commands', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0',
+    fetch: async () => new Response('name,email\nUser,user@example.com', {
+      status: 200,
+      headers: { 'content-type': 'text/csv' },
+    }),
+  });
+
+  assert.equal(
+    await client.request('GET', '/users/export', { query: { format: 'csv' } }),
+    'name,email\nUser,user@example.com',
+  );
+});
+
+test('rejects malformed JSON responses as a protocol error', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0',
+    fetch: async () => new Response('{"data":', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
+  });
+
+  await assert.rejects(client.request('GET', '/projects'), /invalid JSON/);
 });
 
 test('extracts nested API error messages safely', async () => {

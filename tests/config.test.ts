@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdir, mkdtemp, readFile, stat } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -94,4 +94,49 @@ test('builds shell-free Windows ACL commands for the owner and SYSTEM only', () 
     ['C:\\Users\\Sam\\.kooyahq', '/inheritance:r', '/grant:r', 'DESKTOP\\Sam:(OI)(CI)F', 'SYSTEM:(OI)(CI)F'],
     ['C:\\Users\\Sam\\.kooyahq\\config.json', '/inheritance:r', '/grant:r', 'DESKTOP\\Sam:F', 'SYSTEM:F'],
   ]);
+});
+
+test('protects the Windows directory and temporary file before writing a secret', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kooyahq-windows-config-'));
+  const path = join(directory, 'config.json');
+  const protectedTargets: Array<string | undefined> = [];
+
+  await writeConfig(path, {
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+  }, 'win32', {
+    applyWindowsAcl: async (_directory, target) => {
+      protectedTargets.push(target);
+      if (target?.endsWith('.tmp')) assert.equal(await readFile(target, 'utf8'), '');
+    },
+  });
+
+  assert.equal(protectedTargets[0], undefined);
+  assert.ok(protectedTargets.some((target) => target?.endsWith('.tmp')));
+  assert.equal(protectedTargets.at(-1), path);
+  assert.equal((await readConfig(path))?.secretAccessKey, 'secret');
+});
+
+test('restores the previous Windows config if final ACL hardening fails', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kooyahq-windows-restore-'));
+  const path = join(directory, 'config.json');
+  const previous = '{"baseUrl":"https://old.example.com","accessKeyId":"old","secretAccessKey":"old-secret"}\n';
+  await writeFile(path, previous, 'utf8');
+  let finalPathVisits = 0;
+
+  await assert.rejects(
+    writeConfig(path, {
+      baseUrl: 'https://new.example.com', accessKeyId: 'new', secretAccessKey: 'new-secret',
+    }, 'win32', {
+      applyWindowsAcl: async (_directory, target) => {
+        if (target === path) {
+          finalPathVisits += 1;
+          if (finalPathVisits === 2) throw new Error('simulated ACL failure');
+        }
+      },
+    }),
+    /Unable to save/,
+  );
+
+  assert.equal(await readFile(path, 'utf8'), previous);
+  assert.deepEqual(await readdir(directory), ['config.json']);
 });

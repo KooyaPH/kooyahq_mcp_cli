@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
+import { access, chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { ConfigError, ValidationError } from '../core/errors.js';
@@ -50,30 +50,61 @@ export async function readConfig(path) {
         throw new ConfigError('Stored configuration is not valid JSON.');
     }
 }
-export async function writeConfig(path, credentials, platform) {
+export async function writeConfig(path, credentials, platform, options = {}) {
     const validated = validateStoredConfig(credentials);
     const directory = dirname(path);
     const temporaryPath = join(directory, `.config-${randomUUID()}.tmp`);
+    const backupPath = join(directory, `.config-backup-${randomUUID()}.tmp`);
     const privateModes = platform === 'win32' ? {} : { mode: 0o700 };
     await mkdir(directory, { recursive: true, ...privateModes });
     if (platform !== 'win32')
         await chmod(directory, 0o700);
+    const applyWindowsAcl = options.applyWindowsAcl ?? applyWindowsPrivateAcl;
     let handle;
+    let backupCreated = false;
+    let replacementInstalled = false;
     try {
+        if (platform === 'win32')
+            await applyWindowsAcl(directory);
         handle = await open(temporaryPath, 'wx', platform === 'win32' ? undefined : 0o600);
+        if (platform === 'win32')
+            await applyWindowsAcl(directory, temporaryPath);
         await handle.writeFile(`${JSON.stringify(validated, null, 2)}\n`, 'utf8');
         await handle.sync();
         await handle.close();
         handle = undefined;
+        if (platform === 'win32' && await exists(path)) {
+            await applyWindowsAcl(directory, path);
+            await rename(path, backupPath);
+            backupCreated = true;
+        }
         await rename(temporaryPath, path);
+        replacementInstalled = true;
         if (platform === 'win32')
-            await applyWindowsPrivateAcl(directory, path);
+            await applyWindowsAcl(directory, path);
+        if (backupCreated) {
+            await rm(backupPath, { force: true });
+            backupCreated = false;
+        }
     }
     catch {
         if (handle)
             await handle.close().catch(() => undefined);
+        if (replacementInstalled)
+            await rm(path, { force: true }).catch(() => undefined);
+        if (backupCreated)
+            await rename(backupPath, path).catch(() => undefined);
         await rm(temporaryPath, { force: true }).catch(() => undefined);
         throw new ConfigError('Unable to save the KooyaHQ configuration file.');
+    }
+}
+async function exists(path) {
+    try {
+        await access(path);
+        return true;
+    }
+    catch {
+        return false;
     }
 }
 export function windowsPrivateAclCommands(directory, path, account) {
@@ -87,9 +118,8 @@ async function applyWindowsPrivateAcl(directory, path) {
     const account = stdout.trim();
     if (!account)
         throw new Error('whoami returned no account');
-    for (const args of windowsPrivateAclCommands(directory, path, account)) {
-        await execFileAsync('icacls', args);
-    }
+    const commands = windowsPrivateAclCommands(directory, path ?? directory, account);
+    await execFileAsync('icacls', path ? commands[1] : commands[0]);
 }
 export async function clearConfig(path) {
     try {

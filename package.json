@@ -1,6 +1,6 @@
 {
   "name": "kooyahq-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Internal command-line client for KooyaHQ",
   "license": "UNLICENSED",
   "author": "KooyaHQ Engineering",

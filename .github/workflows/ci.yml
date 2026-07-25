@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify committed distribution
+        run: git diff --exit-code -- dist
+
       - name: Audit production dependencies
         run: npm audit --omit=dev
 
@@ -57,16 +60,58 @@ jobs:
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --version
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --help
 
+  cross-platform-smoke:
+    name: ${{ matrix.os }} / Node 18
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build and verify committed distribution
+        run: |
+          npm run build
+          git diff --exit-code -- dist
+        shell: bash
+
+      - name: Smoke-test command and machine-readable skill
+        run: |
+          node dist/bin/kooyahq.js --version
+          node dist/bin/kooyahq.js --help >/dev/null
+          node dist/bin/kooyahq.js --skill tickets create --output json >/dev/null
+        shell: bash
+
+      - name: Smoke-test local Git global installation and command shim
+        run: node scripts/smoke-git-install.mjs
+
   required:
     name: Required checks
     runs-on: [self-hosted, Linux]
-    needs: verify
+    needs: [verify, cross-platform-smoke]
     if: ${{ always() }}
     steps:
       - name: Verify matrix result
         run: |
-          if [ "${{ needs.verify.result }}" != "success" ]; then
-            echo "Node matrix failed: ${{ needs.verify.result }}"
+          if [ "${{ needs.verify.result }}" != "success" ] || [ "${{ needs.cross-platform-smoke.result }}" != "success" ]; then
+            echo "Verification failed: linux=${{ needs.verify.result }}, cross-platform=${{ needs.cross-platform-smoke.result }}"
             exit 1
           fi
-          echo "Node matrix passed."
+          echo "Linux and cross-platform checks passed."
