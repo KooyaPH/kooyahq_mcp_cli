@@ -1,3 +1,6 @@
+import { request as httpsRequest } from 'node:https';
+import type { RequestOptions as HttpsRequestOptions } from 'node:https';
+
 import { ApiError, NetworkError, ValidationError } from '../core/errors.js';
 import type { Credentials } from '../config/types.js';
 import { validateBaseUrl } from '../config/url.js';
@@ -72,7 +75,10 @@ export class ApiClient {
           controller.abort();
           reject(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
         }, this.timeoutMs);
-        void this.fetchImplementation(url, init).then(resolve, reject);
+        const request = this.options.fetch
+          ? this.fetchImplementation(url, init)
+          : nodeHttpsRequest(url, method, headers, init.body);
+        void request.then(resolve, reject);
       });
     } catch {
       throw new NetworkError();
@@ -88,6 +94,49 @@ export class ApiClient {
     }
     return payload as T;
   }
+}
+
+export function buildHttpsRequestOptions(
+  url: URL,
+  method: string,
+  headers: Headers,
+): HttpsRequestOptions {
+  return {
+    method,
+    protocol: url.protocol,
+    hostname: url.hostname,
+    port: url.port || undefined,
+    path: `${url.pathname}${url.search}`,
+    headers: Object.fromEntries(headers.entries()),
+    family: 4,
+    servername: url.hostname,
+  };
+}
+
+function nodeHttpsRequest(
+  url: URL,
+  method: string,
+  headers: Headers,
+  body: BodyInit | null | undefined,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(buildHttpsRequestOptions(url, method, headers), (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer | string) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      response.on('end', () => {
+        resolve(new Response(Buffer.concat(chunks), {
+          status: response.statusCode ?? 0,
+          statusText: response.statusMessage ?? '',
+          headers: response.headers as HeadersInit,
+        }));
+      });
+    });
+    request.on('error', reject);
+    if (body !== undefined && body !== null) request.write(body);
+    request.end();
+  });
 }
 
 async function parseResponse(response: Response, maxResponseBytes: number): Promise<unknown> {
