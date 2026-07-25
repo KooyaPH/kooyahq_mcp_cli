@@ -104,6 +104,8 @@ export function optionValueLabel(spec) {
         return '';
     if (spec.choices?.length)
         return `<${spec.choices.join('|')}>`;
+    if (spec.numericChoices?.length)
+        return `<${spec.numericChoices.join('|')}>`;
     if (spec.format === 'date')
         return '<YYYY-MM-DD>';
     if (spec.format === 'datetime')
@@ -135,6 +137,7 @@ export function optionValueLabel(spec) {
 export function optionConstraints(spec) {
     return [
         ...(spec.choices?.length ? [`enum: ${spec.choices.join(', ')}`] : []),
+        ...(spec.numericChoices?.length ? [`enum: ${spec.numericChoices.join(', ')}`] : []),
         ...(spec.format ? [`format: ${spec.format}`] : []),
         ...(spec.min !== undefined ? [`min: ${spec.min}`] : []),
         ...(spec.max !== undefined ? [`max: ${spec.max}`] : []),
@@ -146,6 +149,8 @@ export function optionConstraints(spec) {
 function sampleFor(name, spec) {
     if (spec.choices?.length)
         return spec.choices[0];
+    if (spec.numericChoices?.length)
+        return String(spec.numericChoices[0]);
     if (spec.format === 'date')
         return '2026-07-25';
     if (spec.format === 'datetime')

@@ -365,6 +365,13 @@ test('enforces and maps ticket JSON, array, and required fields', () => {
     () => buildRequest(commandCatalog, ['tickets', 'update', 't1', '--board-id', 'b2']),
     /Unknown option --board-id/,
   );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'create', '--board-id', 'board-1', '--ticket-type', 'task',
+      '--title', 'Task', '--points', '4',
+    ]),
+    /--points must be 1, 2, 3, 5, 8, 13/,
+  );
 });
 
 test('uses explicit clear flags and rejects conflicting set-and-clear options', () => {

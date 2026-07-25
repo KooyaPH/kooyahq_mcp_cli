@@ -113,6 +113,7 @@ export function commandExamples(command: CommandSpec): string[] {
 export function optionValueLabel(spec: OptionSpec): string {
   if (spec.type === 'switch') return '';
   if (spec.choices?.length) return `<${spec.choices.join('|')}>`;
+  if (spec.numericChoices?.length) return `<${spec.numericChoices.join('|')}>`;
   if (spec.format === 'date') return '<YYYY-MM-DD>';
   if (spec.format === 'datetime') return '<ISO-8601>';
   if (spec.format === 'https-url') return '<https-url>';
@@ -132,6 +133,7 @@ export function optionValueLabel(spec: OptionSpec): string {
 export function optionConstraints(spec: OptionSpec): string[] {
   return [
     ...(spec.choices?.length ? [`enum: ${spec.choices.join(', ')}`] : []),
+    ...(spec.numericChoices?.length ? [`enum: ${spec.numericChoices.join(', ')}`] : []),
     ...(spec.format ? [`format: ${spec.format}`] : []),
     ...(spec.min !== undefined ? [`min: ${spec.min}`] : []),
     ...(spec.max !== undefined ? [`max: ${spec.max}`] : []),
@@ -143,6 +145,7 @@ export function optionConstraints(spec: OptionSpec): string[] {
 
 function sampleFor(name: string, spec: Partial<OptionSpec>): string {
   if (spec.choices?.length) return spec.choices[0]!;
+  if (spec.numericChoices?.length) return String(spec.numericChoices[0]!);
   if (spec.format === 'date') return '2026-07-25';
   if (spec.format === 'datetime') return '2026-07-25T09:00:00+08:00';
   if (spec.format === 'https-url') return 'https://example.com';

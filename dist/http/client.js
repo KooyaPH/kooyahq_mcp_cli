@@ -80,7 +80,7 @@ export class ApiClient {
                 }, this.timeoutMs);
                 const request = this.options.fetch
                     ? this.fetchImplementation(url, init)
-                    : nodeHttpsRequest(url, method, headers, init.body);
+                    : nodeHttpsRequest(url, method, headers, init.body, this.maxResponseBytes);
                 void request.then(resolve, reject);
             });
         }
@@ -105,20 +105,45 @@ export function buildHttpsRequestOptions(url, method, headers) {
         servername: url.hostname,
     };
 }
-function nodeHttpsRequest(url, method, headers, body) {
+function nodeHttpsRequest(url, method, headers, body, maxResponseBytes) {
     return new Promise((resolve, reject) => {
         const request = httpsRequest(buildHttpsRequestOptions(url, method, headers), (response) => {
             const chunks = [];
+            let totalBytes = 0;
+            let settled = false;
+            const rejectOnce = (error) => {
+                if (settled)
+                    return;
+                settled = true;
+                reject(error);
+            };
+            const contentLength = Number(response.headers['content-length']);
+            if (Number.isFinite(contentLength) && contentLength > maxResponseBytes) {
+                response.resume();
+                rejectOnce(new NetworkError('KooyaHQ API response was too large.'));
+                return;
+            }
             response.on('data', (chunk) => {
-                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+                totalBytes += buffer.byteLength;
+                if (totalBytes > maxResponseBytes) {
+                    response.destroy();
+                    rejectOnce(new NetworkError('KooyaHQ API response was too large.'));
+                    return;
+                }
+                chunks.push(buffer);
             });
             response.on('end', () => {
+                if (settled)
+                    return;
+                settled = true;
                 resolve(new Response(Buffer.concat(chunks), {
                     status: response.statusCode ?? 0,
                     statusText: response.statusMessage ?? '',
                     headers: response.headers,
                 }));
             });
+            response.on('error', rejectOnce);
         });
         request.on('error', reject);
         if (body !== undefined && body !== null)
@@ -131,10 +156,7 @@ async function parseResponse(response, maxResponseBytes) {
     if (contentLength && Number(contentLength) > maxResponseBytes) {
         throw new NetworkError('KooyaHQ API response was too large.');
     }
-    const text = await response.text();
-    if (Buffer.byteLength(text, 'utf8') > maxResponseBytes) {
-        throw new NetworkError('KooyaHQ API response was too large.');
-    }
+    const text = await readBoundedResponseText(response, maxResponseBytes);
     if (!text)
         return undefined;
     if (!(response.headers.get('content-type') ?? '').toLowerCase().includes('application/json'))
@@ -145,6 +167,36 @@ async function parseResponse(response, maxResponseBytes) {
     catch {
         return undefined;
     }
+}
+async function readBoundedResponseText(response, maxResponseBytes) {
+    if (!response.body)
+        return '';
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done)
+                break;
+            totalBytes += value.byteLength;
+            if (totalBytes > maxResponseBytes) {
+                await reader.cancel();
+                throw new NetworkError('KooyaHQ API response was too large.');
+            }
+            chunks.push(value);
+        }
+    }
+    finally {
+        reader.releaseLock();
+    }
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(bytes);
 }
 function errorMessage(payload, status) {
     if (payload && typeof payload === 'object') {

@@ -167,6 +167,7 @@ function parameterDocuments(command, definitions, location) {
         requiredDirectly: Boolean(command.requiredOptions?.includes(name)),
         requiredByExactlyOneGroup: Boolean(command.exactlyOne?.some((group) => group.includes(name))),
         ...(definition.choices ? { choices: definition.choices } : {}),
+        ...(definition.numericChoices ? { numericChoices: definition.numericChoices } : {}),
         ...(definition.format ? { format: definition.format } : {}),
         ...(optionConstraints(definition).length > 0
             ? { constraints: optionConstraints(definition) }

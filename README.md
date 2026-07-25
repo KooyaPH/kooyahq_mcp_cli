@@ -346,7 +346,7 @@ kooyahq users list --search "Alex" --all --output json
 
 The CLI is a typed wrapper around HTTPS requests; it is not a permission bypass. Every request is authenticated by the backend and evaluated as the access-key owner. Board membership, board roles, time-entry scopes, user-management permissions, analytics permissions, and administrator permissions remain authoritative server-side.
 
-Accepted CLI requests are audited in KooyaHQ with the acting user, access-key ID, command/action, method and route, source IP, user agent, timestamp, status, and duration. Audit records do not store the request body, response body, or secret. CLI access audits use the dedicated administrator-log permission and the configured rolling retention window.
+Accepted CLI requests are audited in KooyaHQ with the acting user, access-key ID, canonical command/action, source IP, reported CLI version/platform, and timestamp. Audit records do not store the request body, response body, or secret. CLI access audits use the dedicated administrator-log permission and a 180-day rolling retention window.
 
 Client security behavior:
 

@@ -4,6 +4,7 @@ export interface OptionSpec {
     apiName: string;
     type?: ValueType;
     choices?: string[];
+    numericChoices?: number[];
     constant?: string | number | boolean | null;
     format?: 'date' | 'datetime' | 'https-url' | 'hex-color' | 'email' | 'board-key' | 'ticket-key';
     min?: number;

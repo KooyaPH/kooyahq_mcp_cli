@@ -117,6 +117,11 @@ export function buildRequest(catalog: CommandSpec[], argv: string[]): CommandReq
       )) {
         throw new ValidationError(`--${flag} must be ${formatChoices(definition.choices)}.`);
       }
+      if (definition.numericChoices && (
+        typeof converted !== 'number' || !definition.numericChoices.includes(converted)
+      )) {
+        throw new ValidationError(`--${flag} must be ${definition.numericChoices.join(', ')}.`);
+      }
       if (typeof converted !== 'string' && typeof converted !== 'number') {
         throw new ValidationError(`--${flag} must be a path-safe scalar value.`);
       }
@@ -260,6 +265,11 @@ function mapOptions(
     const converted = convertValue(raw, definition, flag);
     if (definition.choices && typeof converted === 'string' && !definition.choices.includes(converted)) {
       throw new ValidationError(`--${flag} must be ${formatChoices(definition.choices)}.`);
+    }
+    if (definition.numericChoices && (
+      typeof converted !== 'number' || !definition.numericChoices.includes(converted)
+    )) {
+      throw new ValidationError(`--${flag} must be ${definition.numericChoices.join(', ')}.`);
     }
     result[definition.apiName] = 'constant' in definition ? definition.constant! : converted;
   }
