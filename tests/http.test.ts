@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import type { Socket } from 'node:net';
 import test from 'node:test';
 
 import { ApiClient, buildHttpsRequestOptions } from '../src/http/client.js';
@@ -35,6 +36,39 @@ test('default transport supports an allowed HTTP localhost origin', async () => 
     });
     assert.deepEqual(await client.request('GET', '/whoami'), { ok: true });
   } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('native transport destroys timed-out sockets and bounds GET retries', async () => {
+  let requests = 0;
+  const openSockets = new Set<Socket>();
+  const server = createServer(() => {
+    requests += 1;
+  });
+  server.on('connection', (socket) => {
+    openSockets.add(socket);
+    socket.on('close', () => openSockets.delete(socket));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    const client = new ApiClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+      version: '1.0.0',
+      timeoutMs: 15,
+      retryDelayMs: 1,
+    });
+
+    await assert.rejects(client.request('GET', '/projects'), /Unable to reach/);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.ok(requests >= 1 && requests <= 3, `observed ${requests} native requests`);
+    assert.equal(openSockets.size, 0);
+  } finally {
+    for (const socket of openSockets) socket.destroy();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });

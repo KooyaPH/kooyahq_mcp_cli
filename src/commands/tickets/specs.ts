@@ -12,6 +12,27 @@ const DEVELOPMENT_STATUSES = [
   'deployment-failed',
   'deployed',
 ];
+const RICH_TEXT_SCHEMA = {
+  type: 'object',
+  required: ['type'],
+  properties: {
+    type: { const: 'doc' },
+    content: { type: 'array' },
+  },
+};
+const RICH_TEXT_EXAMPLE = '{"type":"doc","content":[]}';
+const ACCEPTANCE_CRITERIA_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['text'],
+    properties: {
+      text: { type: 'string' },
+      completed: { type: 'boolean' },
+    },
+  },
+};
+const ACCEPTANCE_CRITERIA_EXAMPLE = '[{"text":"Verified","completed":false}]';
 
 function ticketScope(suffix = ''): Pick<
   CommandSpec,
@@ -20,7 +41,7 @@ function ticketScope(suffix = ''): Pick<
   return {
     path: `/tickets/:ticketId${suffix}`,
     pathParams: {
-      'ticket-id': { apiName: 'ticketId', maxLength: 200 },
+      'ticket-id': { apiName: 'ticketId', format: 'object-id' },
       'ticket-key': { apiName: 'ticketKey', format: 'ticket-key' },
     },
     pathVariants: [
@@ -89,19 +110,25 @@ function legacyTicketChildScope(
 }
 
 const ticketCreateBody = {
-  'board-id': { apiName: 'boardId', maxLength: 200 },
+  'board-id': { apiName: 'boardId', format: 'object-id' as const },
   'board-key': { apiName: 'boardKey', format: 'board-key' as const },
   'ticket-type': { apiName: 'ticketType', choices: TICKET_TYPES },
   title: { apiName: 'title', maxLength: 500 },
-  'description-json': { apiName: 'description', type: 'json-object' as const },
+  'description-json': {
+    apiName: 'description', type: 'json-object' as const,
+    jsonSchema: RICH_TEXT_SCHEMA, example: RICH_TEXT_EXAMPLE,
+  },
   'column-id': { apiName: 'columnId' },
   points: { apiName: 'points', type: 'integer' as const, numericChoices: [1, 2, 3, 5, 8, 13] },
   priority: { apiName: 'priority', choices: PRIORITIES }, tags: { apiName: 'tags', type: 'csv' as const },
   'assignee-id': { apiName: 'assigneeId' },
-  'acceptance-criteria-json': { apiName: 'acceptanceCriteria', type: 'json-array' as const },
-  'parent-ticket-id': { apiName: 'parentTicketId', maxLength: 200 },
+  'acceptance-criteria-json': {
+    apiName: 'acceptanceCriteria', type: 'json-array' as const,
+    jsonSchema: ACCEPTANCE_CRITERIA_SCHEMA, example: ACCEPTANCE_CRITERIA_EXAMPLE,
+  },
+  'parent-ticket-id': { apiName: 'parentTicketId', format: 'object-id' as const },
   'parent-ticket-key': { apiName: 'parentTicketKey', format: 'ticket-key' as const },
-  'root-epic-id': { apiName: 'rootEpicId', maxLength: 200 },
+  'root-epic-id': { apiName: 'rootEpicId', format: 'object-id' as const },
   'root-epic-key': { apiName: 'rootEpicKey', format: 'ticket-key' as const },
   'start-date': { apiName: 'startDate', format: 'date' as const },
   'end-date': { apiName: 'endDate', format: 'date' as const },
@@ -135,7 +162,7 @@ const ticketUpdateWithClearBody = {
 export const ticketCommands: CommandSpec[] = [
   { name: 'tickets list', method: 'GET', path: '/tickets', query: listQuery({
     search: { apiName: 'search' },
-    'board-id': { apiName: 'boardId' },
+    'board-id': { apiName: 'boardId', format: 'object-id' },
     'board-key': { apiName: 'boardKey', format: 'board-key' },
     'ticket-type': { apiName: 'ticketType', choices: TICKET_TYPES },
     'column-id': { apiName: 'columnId' }, 'assignee-id': { apiName: 'assigneeId' },
@@ -154,6 +181,10 @@ export const ticketCommands: CommandSpec[] = [
       ['parent-ticket-id', 'parent-ticket-key'],
       ['root-epic-id', 'root-epic-key'],
     ],
+    conditionalExactlyOne: [{
+      when: { option: 'ticket-type', value: 'subtask' },
+      options: ['parent-ticket-id', 'parent-ticket-key'],
+    }],
   },
   {
     name: 'tickets update',
@@ -181,7 +212,10 @@ export const ticketCommands: CommandSpec[] = [
     ...legacyTicketScope('/comments', 'ticketId'),
     body: {
       content: { apiName: 'content' },
-      'content-json': { apiName: 'content', type: 'json-object' },
+      'content-json': {
+        apiName: 'content', type: 'json-object',
+        jsonSchema: RICH_TEXT_SCHEMA, example: RICH_TEXT_EXAMPLE,
+      },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -194,7 +228,10 @@ export const ticketCommands: CommandSpec[] = [
     ...legacyTicketChildScope('/comments/:commentId', 'comment-id', 'commentId'),
     body: {
       content: { apiName: 'content' },
-      'content-json': { apiName: 'content', type: 'json-object' },
+      'content-json': {
+        apiName: 'content', type: 'json-object',
+        jsonSchema: RICH_TEXT_SCHEMA, example: RICH_TEXT_EXAMPLE,
+      },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -211,19 +248,19 @@ export const ticketCommands: CommandSpec[] = [
   },
   { name: 'tickets search', method: 'GET', path: '/tickets/search', query: listQuery({
     query: { apiName: 'q' },
-    'board-id': { apiName: 'boardId' },
+    'board-id': { apiName: 'boardId', format: 'object-id' },
     'board-key': { apiName: 'boardKey', format: 'board-key' },
     archived: { apiName: 'archived', type: 'boolean' },
   }, ['createdAt']), requiredOptions: ['query'],
   atMostOne: [['board-id', 'board-key']] },
   { name: 'tickets assigned', method: 'GET', path: '/tickets/assigned', query: listQuery({
-    'board-id': { apiName: 'boardId' },
+    'board-id': { apiName: 'boardId', format: 'object-id' },
     'board-key': { apiName: 'boardKey', format: 'board-key' },
     archived: { apiName: 'archived', type: 'boolean' },
   }, ['createdAt']),
   atMostOne: [['board-id', 'board-key']] },
   { name: 'tickets detail', method: 'GET', ...ticketScope('/detail') },
-  { name: 'tickets activities list', method: 'GET', ...ticketScope('/activities'), query: listQuery({}, ['occurredAt', 'createdAt']) },
+  { name: 'tickets activities list', method: 'GET', ...ticketScope('/activities'), query: listQuery({}, ['createdAt']) },
   { name: 'tickets viewers list', method: 'GET', ...ticketScope('/viewers'), query: listQuery({}, ['name', 'email']) },
   { name: 'tickets archive', method: 'POST', ...ticketScope('/archive') },
   { name: 'tickets unarchive', method: 'POST', ...ticketScope('/unarchive') },
@@ -233,9 +270,9 @@ export const ticketCommands: CommandSpec[] = [
     ...ticketScope('/move'),
     body: {
       'column-id': { apiName: 'columnId' },
-      'before-ticket-id': { apiName: 'beforeTicketId' },
+      'before-ticket-id': { apiName: 'beforeTicketId', format: 'object-id' },
       'before-ticket-key': { apiName: 'beforeTicketKey', format: 'ticket-key' },
-      'after-ticket-id': { apiName: 'afterTicketId' },
+      'after-ticket-id': { apiName: 'afterTicketId', format: 'object-id' },
       'after-ticket-key': { apiName: 'afterTicketKey', format: 'ticket-key' },
       first: { apiName: 'position', type: 'switch', constant: 'first' },
       last: { apiName: 'position', type: 'switch', constant: 'last' },
@@ -254,7 +291,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     ...ticketScope('/improve'),
     body: {
-      'user-command': { apiName: 'userCommand', maxLength: 5000 },
+      'user-command': { apiName: 'userCommand', maxLength: 2000 },
     },
   },
   {
@@ -262,12 +299,21 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     path: '/tickets/improve-draft',
     body: {
-      'board-id': { apiName: 'boardId' },
+      'board-id': { apiName: 'boardId', format: 'object-id' },
       'board-key': { apiName: 'boardKey', format: 'board-key' },
-      'draft-json': { apiName: 'draft', type: 'json-object' },
-      'user-command': { apiName: 'userCommand', maxLength: 5000 },
+      title: { apiName: 'title', maxLength: 500 },
+      'description-json': {
+        apiName: 'description', type: 'json-object',
+        jsonSchema: RICH_TEXT_SCHEMA, example: RICH_TEXT_EXAMPLE,
+      },
+      'acceptance-criteria-json': {
+        apiName: 'acceptanceCriteria', type: 'json-array',
+        jsonSchema: ACCEPTANCE_CRITERIA_SCHEMA, example: ACCEPTANCE_CRITERIA_EXAMPLE,
+      },
+      'ticket-type': { apiName: 'ticketType', choices: TICKET_TYPES },
+      'user-command': { apiName: 'userCommand', maxLength: 2000 },
     },
-    requiredOptions: ['draft-json'],
+    requiredOptions: ['title'],
     exactlyOne: [['board-id', 'board-key']],
   },
   {
@@ -275,7 +321,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'PATCH',
     ...ticketScope('/parent'),
     body: {
-      'parent-ticket-id': { apiName: 'parentTicketId' },
+      'parent-ticket-id': { apiName: 'parentTicketId', format: 'object-id' },
       'parent-ticket-key': { apiName: 'parentTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
@@ -289,7 +335,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'PATCH',
     ...ticketScope('/epic'),
     body: {
-      'epic-ticket-id': { apiName: 'epicTicketId' },
+      'epic-ticket-id': { apiName: 'epicTicketId', format: 'object-id' },
       'epic-ticket-key': { apiName: 'epicTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
@@ -349,7 +395,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     ...ticketScope('/related-tickets'),
     body: {
-      'related-ticket-id': { apiName: 'relatedTicketId' },
+      'related-ticket-id': { apiName: 'relatedTicketId', format: 'object-id' },
       'related-ticket-key': { apiName: 'relatedTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
@@ -362,7 +408,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'DELETE',
     ...ticketScope('/related-tickets'),
     body: {
-      'related-ticket-id': { apiName: 'relatedTicketId' },
+      'related-ticket-id': { apiName: 'relatedTicketId', format: 'object-id' },
       'related-ticket-key': { apiName: 'relatedTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
@@ -386,7 +432,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     ...ticketScope('/blockers'),
     body: {
-      'blocker-ticket-id': { apiName: 'blockerTicketId' },
+      'blocker-ticket-id': { apiName: 'blockerTicketId', format: 'object-id' },
       'blocker-ticket-key': { apiName: 'blockerTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
@@ -399,7 +445,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'DELETE',
     ...ticketScope('/blockers'),
     body: {
-      'blocker-ticket-id': { apiName: 'blockerTicketId' },
+      'blocker-ticket-id': { apiName: 'blockerTicketId', format: 'object-id' },
       'blocker-ticket-key': { apiName: 'blockerTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
@@ -414,7 +460,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'PATCH',
     ...ticketScope('/development'),
     body: {
-      branch: { apiName: 'branch' },
+      branch: { apiName: 'branchName' },
       status: { apiName: 'status', choices: DEVELOPMENT_STATUSES },
       'pull-request-url': { apiName: 'pullRequestUrl', format: 'https-url', maxLength: 2048 },
       'target-branch': { apiName: 'targetBranch' },
@@ -432,7 +478,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     path: '/tickets/import/preview',
     body: {
-      'board-id': { apiName: 'boardId' },
+      'board-id': { apiName: 'boardId', format: 'object-id' },
       'board-key': { apiName: 'boardKey', format: 'board-key' },
     },
     exactlyOne: [['board-id', 'board-key']],
@@ -443,7 +489,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     path: '/tickets/import',
     body: {
-      'board-id': { apiName: 'boardId' },
+      'board-id': { apiName: 'boardId', format: 'object-id' },
       'board-key': { apiName: 'boardKey', format: 'board-key' },
     },
     exactlyOne: [['board-id', 'board-key']],

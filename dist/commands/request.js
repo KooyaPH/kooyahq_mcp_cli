@@ -19,6 +19,9 @@ export function buildRequest(catalog, argv) {
     if (parsed.all && (!command.query?.page || !command.query.limit)) {
         throw new ValidationError('--all is available only for paginated list commands.');
     }
+    if (parsed.all && parsed.values.page !== undefined) {
+        throw new ValidationError('Do not combine --all with --page.');
+    }
     if (command.fileInput) {
         const sources = ['file', 'stdin'].filter((flag) => parsed.values[flag] !== undefined);
         if (sources.length !== 1) {
@@ -58,6 +61,14 @@ export function buildRequest(catalog, argv) {
         if (parsed.values[rule.option] !== undefined
             && parsed.values[rule.requires] !== rule.value) {
             throw new ValidationError(`--${rule.option} requires --${rule.requires} ${rule.value}.`);
+        }
+    }
+    for (const rule of command.conditionalExactlyOne ?? []) {
+        if (parsed.values[rule.when.option] !== rule.when.value)
+            continue;
+        const supplied = rule.options.filter((flag) => parsed.values[flag] !== undefined);
+        if (supplied.length !== 1) {
+            throw new ValidationError(`${command.name} with --${rule.when.option} ${rule.when.value} requires exactly one of ${formatFlags(rule.options)}.`);
         }
     }
     for (const group of command.pairedOptions ?? []) {
@@ -297,6 +308,12 @@ function convertValue(value, definition, flag) {
         if (definition.uniqueItems && new Set(values).size !== values.length) {
             throw new ValidationError(`--${flag} must not contain duplicates.`);
         }
+        if (definition.itemChoices) {
+            const unsupported = values.find((item) => !definition.itemChoices.includes(item));
+            if (unsupported) {
+                throw new ValidationError(`--${flag} contains unsupported value ${unsupported}.`);
+            }
+        }
         return values;
     }
     if (type === 'singleton') {
@@ -379,6 +396,12 @@ function validateFormat(value, format, flag) {
         }
         return;
     }
+    if (format === 'object-id') {
+        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+            throw new ValidationError(`--${flag} must be a 24-character hexadecimal ObjectId.`);
+        }
+        return;
+    }
     let url;
     try {
         url = new URL(value);
@@ -386,8 +409,7 @@ function validateFormat(value, format, flag) {
     catch {
         throw new ValidationError(`--${flag} must be an HTTPS URL.`);
     }
-    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
-    if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) || url.username || url.password) {
+    if (url.protocol !== 'https:' || url.username || url.password) {
         throw new ValidationError(`--${flag} must be an HTTPS URL.`);
     }
 }

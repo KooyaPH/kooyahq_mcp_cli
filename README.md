@@ -99,7 +99,7 @@ kooyahq --skill tickets create --output json
 
 Command help includes the workflow, exact flags, enum values, required groups, conditional parameters, compatibility aliases, shell-safe examples, response notes, and security behavior. `--skill ... --output json` emits schema version 2: a stable, machine-readable command contract with parameter descriptions, truthful exactly-one groups, import schemas, and response metadata for automation and AI tools.
 
-Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
+Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Board and ticket ID selectors and ticket-ID anchors require a 24-character hexadecimal ObjectId; keys use the documented `OPS` or `OPS-42` forms. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
 
 ## Command catalog
 
@@ -218,7 +218,9 @@ tickets development clear
 
 Ticket IDs and keys are exact selectors. Board-scoped list/create/import commands require exactly one board ID or board key. Ticket mutations cover the web application's lifecycle, comments, assignments, relationships, blockers, hierarchy, acceptance criteria, documents, and GitHub development data.
 
-Ticket creation accepts optional, mutually exclusive `--parent-ticket-id|--parent-ticket-key` and `--root-epic-id|--root-epic-key` selectors. Move anchors accept exact ID or key variants for `before` and `after`, plus `--first` or `--last`. `tickets improve` and `tickets improve-draft` return preview suggestions only; use `--user-command` for optional guidance. They do not apply fields automatically.
+Ticket creation accepts mutually exclusive `--parent-ticket-id|--parent-ticket-key` and `--root-epic-id|--root-epic-key` selectors. A subtask requires exactly one of `--parent-ticket-id|--parent-ticket-key`; other ticket types may omit a parent. Move anchors accept exact ID or key variants for `before` and `after`, plus `--first` or `--last`.
+
+`tickets improve` and `tickets improve-draft` return preview suggestions only and never apply fields automatically. Draft improvement requires `--title` and accepts flattened `--description-json`, `--acceptance-criteria-json`, `--ticket-type`, and `--user-command` fields. User guidance is limited to 2,000 characters. Development updates accept `--branch`, which is sent using the backend `branchName` contract.
 
 Document links do not have persistent document IDs. Add a document with exact `--name`, `--url`, and `--type`; remove it by the same exact `--url`. Blocker reads accept `--direction blocked-by|blocking|all` (default `all`) and return a `{ blockedBy, blocking }` relationship envelope.
 
@@ -298,7 +300,7 @@ users templates list
 users templates get
 ```
 
-`users list --all --output json` is the assignment-friendly user lookup. Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Use `users export --format csv --output raw` for a CSV stream. User create/update supports `--whatsapp-phone`; update supports `--clear-whatsapp-phone`. Use `--clear-permissions` to intentionally send an empty permission array instead of passing an ambiguous blank CSV value.
+`users list --all --output json` is the assignment-friendly user lookup. Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Discover the current assignable permission templates with `kooyahq users templates list --output json`; the CLI rejects unknown permission names locally, while the backend still decides which catalog entries the acting user may assign. Preview permission changes with `--dry-run`. Use `users export --format csv --output raw` for a CSV stream. User create/update supports `--whatsapp-phone`; update supports `--clear-whatsapp-phone`. Use `--clear-permissions` to intentionally send an empty permission array instead of passing an ambiguous blank CSV value.
 
 ### Notifications
 
@@ -316,8 +318,8 @@ Notifications are always scoped to the authenticated user. Lists are paginated a
 Paginated list commands support:
 
 ```text
---page <positive-integer>
---limit <positive-integer>
+--page <1-100>
+--limit <1-100>
 --sort <allowlisted-field>
 --order <asc|desc>
 --all
@@ -329,7 +331,8 @@ Global command behavior:
 - `--output json` preserves structured API responses.
 - `--output raw` is intended for text exports.
 - `--dry-run` validates and prints the request without reading credentials or sending traffic.
-- `--all` fetches paginated GET results sequentially with hard aggregate caps of 1,000 pages, 100,000 items, and 50 MiB of retained JSON data.
+- `--all` fetches paginated GET results sequentially with hard aggregate caps of 100 pages, 100,000 items, and 50 MiB of retained JSON data.
+- `--page` and `--all` cannot be combined; omit `--page` when requesting every page.
 - `--yes` skips a documented confirmation; it is rejected on commands that do not support it.
 - Mutations are never retried. GET transport failures are retried at most twice after the first attempt.
 

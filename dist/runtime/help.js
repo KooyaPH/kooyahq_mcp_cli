@@ -68,6 +68,7 @@ function commandHelp(command) {
         ...(command.exactlyOne ?? []).map((group) => `  Exactly one: ${group.map(flag).join(', ')}`),
         ...(command.atMostOne ?? []).map((group) => `  At most one: ${group.map(flag).join(', ')}`),
         ...(command.conditionalRequirements ?? []).map((rule) => `  Conditional: --${rule.option} requires --${rule.requires} ${rule.value}`),
+        ...(command.conditionalExactlyOne ?? []).map((rule) => `  When --${rule.when.option} is ${rule.when.value}, supply exactly one of ${rule.options.map(flag).join(', ')}`),
         ...(command.pairedOptions ?? []).map((group) => `  Together: ${group.map(flag).join(', ')}`),
         ...rangeDocuments(command.dateRange).map((range) => `  Date range: --${range.startOption} through --${range.endOption}; maximum ${range.maxDays} days`),
         ...rangeDocuments(command.dateTimeRange).map((range) => `  Timestamp order: --${range.startOption} must not be after --${range.endOption}`),

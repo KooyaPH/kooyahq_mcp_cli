@@ -92,6 +92,7 @@ function commandSkillMarkdown(command) {
         ...(command.exactlyOne ?? []).map((group) => `- Exactly one of: ${group.map(flagName).join(', ')}.`),
         ...(command.atMostOne ?? []).map((group) => `- At most one of: ${group.map(flagName).join(', ')}.`),
         ...(command.conditionalRequirements ?? []).map((rule) => `- \`--${rule.option}\` requires \`--${rule.requires} ${rule.value}\`.`),
+        ...(command.conditionalExactlyOne ?? []).map((rule) => `- When \`--${rule.when.option}\` is \`${rule.when.value}\`, supply exactly one of: ${rule.options.map(flagName).join(', ')}.`),
         ...(command.pairedOptions ?? []).map((group) => `- Supply together or omit together: ${group.map(flagName).join(', ')}.`),
         ...rangeDocuments(command.dateRange).map((range) => `- Date range: \`--${range.startOption}\` through \`--${range.endOption}\`, maximum ${range.maxDays} days.`),
         ...rangeDocuments(command.dateTimeRange).map((range) => `- Timestamp order: \`--${range.startOption}\` must not be after \`--${range.endOption}\`.`),
@@ -181,6 +182,7 @@ function commandSkillDocument(command) {
         exactlyOne,
         atMostOne: command.atMostOne ?? [],
         conditionalRequirements: command.conditionalRequirements ?? [],
+        conditionalExactlyOne: command.conditionalExactlyOne ?? [],
         pairedOptions: command.pairedOptions ?? [],
         dateRanges: rangeDocuments(command.dateRange),
         dateTimeRanges: rangeDocuments(command.dateTimeRange),
@@ -218,7 +220,10 @@ function parameterDocuments(command, definitions, location) {
         requiredByExactlyOneGroup: Boolean(command.exactlyOne?.some((group) => group.includes(name))),
         ...(definition.choices ? { choices: definition.choices } : {}),
         ...(definition.numericChoices ? { numericChoices: definition.numericChoices } : {}),
+        ...(definition.itemChoices ? { itemChoices: definition.itemChoices } : {}),
         ...(definition.format ? { format: definition.format } : {}),
+        ...(definition.jsonSchema ? { jsonSchema: definition.jsonSchema } : {}),
+        ...(definition.example ? { example: definition.example } : {}),
         ...(optionConstraints(definition).length > 0
             ? { constraints: optionConstraints(definition) }
             : {}),
@@ -234,9 +239,13 @@ function authenticationDocument() {
 function parseSkillArguments(argv) {
     const scope = [];
     let format = 'markdown';
+    let outputSupplied = false;
     for (let index = 0; index < argv.length; index += 1) {
         const token = argv[index];
         if (token === '--output') {
+            if (outputSupplied)
+                throw new ValidationError('--skill --output must not be repeated.');
+            outputSupplied = true;
             const value = argv[index + 1];
             if (value !== 'json' && value !== 'markdown') {
                 throw new ValidationError('--skill --output must be markdown or json.');
@@ -246,6 +255,9 @@ function parseSkillArguments(argv) {
             continue;
         }
         if (token.startsWith('--output=')) {
+            if (outputSupplied)
+                throw new ValidationError('--skill --output must not be repeated.');
+            outputSupplied = true;
             const value = token.slice('--output='.length);
             if (value !== 'json' && value !== 'markdown') {
                 throw new ValidationError('--skill --output must be markdown or json.');

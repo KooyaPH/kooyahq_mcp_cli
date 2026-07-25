@@ -10,6 +10,26 @@ const GITHUB_STATUSES = [
   'deployment-failed',
   'deployed',
 ];
+const BOARD_COLUMNS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['name'],
+    properties: {
+      name: { type: 'string' },
+      color: { type: 'string' },
+      isDone: { type: 'boolean' },
+      wipLimit: { type: 'integer', minimum: 0 },
+    },
+  },
+};
+const BOARD_SETTINGS_SCHEMA = {
+  type: 'object',
+  properties: {
+    defaultView: { type: 'string', enum: ['board', 'list', 'timeline'] },
+    showSwimlanes: { type: 'boolean' },
+  },
+};
 
 function boardScope(suffix = ''): Pick<
   CommandSpec,
@@ -18,7 +38,7 @@ function boardScope(suffix = ''): Pick<
   return {
     path: `/boards/:boardId${suffix}`,
     pathParams: {
-      'board-id': { apiName: 'boardId', maxLength: 200 },
+      'board-id': { apiName: 'boardId', format: 'object-id' },
       'board-key': { apiName: 'boardKey', format: 'board-key' },
     },
     pathVariants: [
@@ -65,8 +85,18 @@ const boardCreateBody = {
   type: { apiName: 'type', choices: ['kanban', 'sprint'] },
   description: { apiName: 'description', maxLength: 5000 },
   prefix: { apiName: 'prefix', format: 'board-key' as const }, emoji: { apiName: 'emoji', maxLength: 20 },
-  'columns-json': { apiName: 'columns', type: 'json-array' as const },
-  'settings-json': { apiName: 'settings', type: 'json-object' as const },
+  'columns-json': {
+    apiName: 'columns',
+    type: 'json-array' as const,
+    jsonSchema: BOARD_COLUMNS_SCHEMA,
+    example: '[{"name":"Backlog","color":"#64748b","isDone":false}]',
+  },
+  'settings-json': {
+    apiName: 'settings',
+    type: 'json-object' as const,
+    jsonSchema: BOARD_SETTINGS_SCHEMA,
+    example: '{"defaultView":"board","showSwimlanes":false}',
+  },
 };
 const { type: _type, ...boardUpdateBody } = boardCreateBody;
 const settingsBody = {
@@ -84,7 +114,7 @@ export const boardCommands: CommandSpec[] = [
     path: '/boards/:boardId',
     positionals: [{ name: 'id', optional: true, aliasFor: 'board-id', deprecated: true }],
     pathParams: {
-      'board-id': { apiName: 'boardId', maxLength: 200 },
+      'board-id': { apiName: 'boardId', format: 'object-id' },
       'board-key': { apiName: 'boardKey', format: 'board-key' },
     },
     pathVariants: [
@@ -154,7 +184,7 @@ export const boardCommands: CommandSpec[] = [
     requiredOptions: ['user-id'],
     confirmation: 'Remove board member?',
   },
-  { name: 'boards activities list', method: 'GET', ...boardScope('/activities'), query: listQuery({}, ['occurredAt', 'createdAt']) },
+  { name: 'boards activities list', method: 'GET', ...boardScope('/activities'), query: listQuery({}, ['createdAt']) },
   { name: 'boards mentions list', method: 'GET', ...boardScope('/mention-candidates'), query: listQuery({
     search: { apiName: 'search' },
   }, ['name', 'email']) },

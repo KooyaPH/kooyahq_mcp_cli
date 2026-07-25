@@ -116,6 +116,9 @@ function commandSkillMarkdown(command: CommandSpec): string {
     ...(command.conditionalRequirements ?? []).map(
       (rule) => `- \`--${rule.option}\` requires \`--${rule.requires} ${rule.value}\`.`,
     ),
+    ...(command.conditionalExactlyOne ?? []).map(
+      (rule) => `- When \`--${rule.when.option}\` is \`${rule.when.value}\`, supply exactly one of: ${rule.options.map(flagName).join(', ')}.`,
+    ),
     ...(command.pairedOptions ?? []).map(
       (group) => `- Supply together or omit together: ${group.map(flagName).join(', ')}.`,
     ),
@@ -217,6 +220,7 @@ function commandSkillDocument(command: CommandSpec): Record<string, unknown> {
     exactlyOne,
     atMostOne: command.atMostOne ?? [],
     conditionalRequirements: command.conditionalRequirements ?? [],
+    conditionalExactlyOne: command.conditionalExactlyOne ?? [],
     pairedOptions: command.pairedOptions ?? [],
     dateRanges: rangeDocuments(command.dateRange),
     dateTimeRanges: rangeDocuments(command.dateTimeRange),
@@ -259,7 +263,10 @@ function parameterDocuments(
     requiredByExactlyOneGroup: Boolean(command.exactlyOne?.some((group) => group.includes(name))),
     ...(definition.choices ? { choices: definition.choices } : {}),
     ...(definition.numericChoices ? { numericChoices: definition.numericChoices } : {}),
+    ...(definition.itemChoices ? { itemChoices: definition.itemChoices } : {}),
     ...(definition.format ? { format: definition.format } : {}),
+    ...(definition.jsonSchema ? { jsonSchema: definition.jsonSchema } : {}),
+    ...(definition.example ? { example: definition.example } : {}),
     ...(optionConstraints(definition).length > 0
       ? { constraints: optionConstraints(definition) }
       : {}),
@@ -280,9 +287,12 @@ function parseSkillArguments(argv: string[]): {
 } {
   const scope: string[] = [];
   let format: 'markdown' | 'json' = 'markdown';
+  let outputSupplied = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]!;
     if (token === '--output') {
+      if (outputSupplied) throw new ValidationError('--skill --output must not be repeated.');
+      outputSupplied = true;
       const value = argv[index + 1];
       if (value !== 'json' && value !== 'markdown') {
         throw new ValidationError('--skill --output must be markdown or json.');
@@ -292,6 +302,8 @@ function parseSkillArguments(argv: string[]): {
       continue;
     }
     if (token.startsWith('--output=')) {
+      if (outputSupplied) throw new ValidationError('--skill --output must not be repeated.');
+      outputSupplied = true;
       const value = token.slice('--output='.length);
       if (value !== 'json' && value !== 'markdown') {
         throw new ValidationError('--skill --output must be markdown or json.');

@@ -113,7 +113,14 @@ export class ApiClient {
         }, this.timeoutMs);
         const request = this.options.fetch
           ? this.fetchImplementation(url, init)
-          : nodeNativeRequest(url, method, headers, init.body, this.maxResponseBytes);
+          : nodeNativeRequest(
+            url,
+            method,
+            headers,
+            init.body,
+            this.maxResponseBytes,
+            controller.signal,
+          );
         void request.then(resolve, reject);
       });
     } finally {
@@ -149,18 +156,27 @@ function nodeNativeRequest(
   headers: Headers,
   body: BodyInit | null | undefined,
   maxResponseBytes: number,
+  signal: AbortSignal,
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener('abort', onAbort);
+    const rejectOnce = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const resolveOnce = (response: Response) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(response);
+    };
     const requestImplementation = url.protocol === 'http:' ? httpRequest : httpsRequest;
     const request = requestImplementation(buildHttpsRequestOptions(url, method, headers), (response) => {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
-      let settled = false;
-      const rejectOnce = (error: Error) => {
-        if (settled) return;
-        settled = true;
-        reject(error);
-      };
       const contentLength = Number(response.headers['content-length']);
       if (Number.isFinite(contentLength) && contentLength > maxResponseBytes) {
         response.resume();
@@ -178,9 +194,7 @@ function nodeNativeRequest(
         chunks.push(buffer);
       });
       response.on('end', () => {
-        if (settled) return;
-        settled = true;
-        resolve(new Response(Buffer.concat(chunks), {
+        resolveOnce(new Response(Buffer.concat(chunks), {
           status: response.statusCode ?? 0,
           statusText: response.statusMessage ?? '',
           headers: response.headers as HeadersInit,
@@ -188,7 +202,12 @@ function nodeNativeRequest(
       });
       response.on('error', rejectOnce);
     });
-    request.on('error', reject);
+    function onAbort(): void {
+      request.destroy(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+    request.on('error', rejectOnce);
+    if (signal.aborted) onAbort();
     if (body !== undefined && body !== null) request.write(body);
     request.end();
   });

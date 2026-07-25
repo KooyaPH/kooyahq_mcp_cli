@@ -39,7 +39,7 @@ export interface AllPagesLimits {
 }
 
 const DEFAULT_ALL_PAGES_LIMITS: AllPagesLimits = {
-  maxPages: 1_000,
+  maxPages: 100,
   maxItems: 100_000,
   maxBytes: 50 * 1024 * 1024,
 };

@@ -172,7 +172,7 @@ test('prints a mutation dry run before configuration without sending network tra
   const lines: string[] = [];
   const code = await runCli([
     'tickets', 'create',
-    '--board-id', 'board-1',
+    '--board-id', '507f1f77bcf86cd799439011',
     '--ticket-type', 'task',
     '--title', 'Release',
     '--dry-run',
@@ -192,7 +192,7 @@ test('prints a mutation dry run before configuration without sending network tra
     path: '/tickets',
     query: {},
     body: {
-      boardId: 'board-1',
+      boardId: '507f1f77bcf86cd799439011',
       ticketType: 'task',
       title: 'Release',
     },
@@ -227,6 +227,35 @@ test('fetches every page for a paginated list only when --all is explicit', asyn
   assert.equal(code, 0);
   assert.deepEqual(requestedPages, ['1', '2']);
   assert.deepEqual(JSON.parse(lines.join('\n')).data, [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }]);
+});
+
+test('bounds --all at the backend maximum page', async () => {
+  const requestedPages: number[] = [];
+  const errors: string[] = [];
+  const code = await runCli(
+    ['projects', 'list', '--all', '--limit', '1', '--output', 'json'],
+    dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      fetch: async (input) => {
+        const page = Number(new URL(String(input)).searchParams.get('page'));
+        requestedPages.push(page);
+        return new Response(JSON.stringify({
+          data: [{ id: `p${page}` }],
+          pagination: { page, limit: 1, totalPages: 101 },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+      output: { stdout: () => undefined, stderr: (value) => errors.push(value) },
+    }),
+  );
+
+  assert.equal(code, 2);
+  assert.equal(requestedPages.length, 100);
+  assert.equal(Math.max(...requestedPages), 100);
+  assert.match(errors.join('\n'), /exceeded the 100-page safety limit/);
 });
 
 test('stops --all before retaining more than the configured item limit', async () => {
@@ -284,7 +313,7 @@ test('loads a bounded JSON ticket import file before sending a preview request',
   const requests: Array<{ url: string; body: unknown }> = [];
   const code = await runCli([
     'tickets', 'import', 'preview',
-    '--board-id', 'board-1',
+    '--board-id', '507f1f77bcf86cd799439011',
     '--file', 'tickets.json',
     '--format', 'json',
     '--output', 'json',
@@ -312,7 +341,7 @@ test('loads a bounded JSON ticket import file before sending a preview request',
   assert.deepEqual(requests, [{
     url: 'https://example.com/api/cli/v1/tickets/import/preview',
     body: {
-      boardId: 'board-1',
+      boardId: '507f1f77bcf86cd799439011',
       rows: [{ title: 'Release', ticketType: 'task' }],
     },
   }]);

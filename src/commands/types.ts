@@ -14,14 +14,17 @@ export interface OptionSpec {
   apiName: string;
   type?: ValueType;
   choices?: string[];
+  itemChoices?: string[];
   numericChoices?: number[];
   constant?: string | number | boolean | null | unknown[] | Record<string, unknown>;
-  format?: 'date' | 'datetime' | 'https-url' | 'hex-color' | 'email' | 'board-key' | 'ticket-key';
+  format?: 'date' | 'datetime' | 'https-url' | 'hex-color' | 'email' | 'board-key' | 'ticket-key' | 'object-id';
   min?: number;
   max?: number;
   maxLength?: number;
   maxItems?: number;
   uniqueItems?: boolean;
+  jsonSchema?: Record<string, unknown>;
+  example?: string;
 }
 
 export interface PositionalSpec {
@@ -52,6 +55,14 @@ export interface ConditionalRequirement {
   option: string;
   requires: string;
   value: string;
+}
+
+export interface ConditionalExactlyOne {
+  when: {
+    option: string;
+    value: string;
+  };
+  options: string[];
 }
 
 export interface DateRangeSpec {
@@ -86,6 +97,7 @@ export interface CommandSpec {
   dateRange?: DateRangeSpec | DateRangeSpec[];
   dateTimeRange?: DateTimeRangeSpec | DateTimeRangeSpec[];
   conditionalRequirements?: ConditionalRequirement[];
+  conditionalExactlyOne?: ConditionalExactlyOne[];
   pairedOptions?: string[][];
   response?: {
     description: string;

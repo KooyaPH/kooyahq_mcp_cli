@@ -86,6 +86,9 @@ function commandHelp(command: CommandSpec): string {
     ...(command.conditionalRequirements ?? []).map(
       (rule) => `  Conditional: --${rule.option} requires --${rule.requires} ${rule.value}`,
     ),
+    ...(command.conditionalExactlyOne ?? []).map(
+      (rule) => `  When --${rule.when.option} is ${rule.when.value}, supply exactly one of ${rule.options.map(flag).join(', ')}`,
+    ),
     ...(command.pairedOptions ?? []).map(
       (group) => `  Together: ${group.map(flag).join(', ')}`,
     ),

@@ -110,6 +110,9 @@ export function commandExamples(command: CommandSpec): string[] {
   }
   if (command.fileInput) parts.push('--file', 'tickets.json');
   const invocation = parts.join(' ');
+  if (command.name === 'users permissions update') {
+    return [`${invocation} --dry-run --output json`];
+  }
   return command.method === 'GET'
     ? [invocation, `${invocation} --output json`]
     : [`${invocation} --dry-run --output json`, invocation];
@@ -130,6 +133,7 @@ export function optionDescription(name: string, location: 'path' | 'query' | 'bo
     stdin: 'Read the bounded ticket import payload from standard input.',
     format: 'Input or output representation accepted by this command.',
     direction: 'Blocker relationship direction; defaults to all.',
+    permissions: 'Comma-separated permissions from the current backend catalog; discover templates with `kooyahq users templates list --output json`.',
   };
   if (descriptions[name]) return descriptions[name]!;
   if (name.endsWith('-id')) return `Exact ${humanize(name.slice(0, -3))} identifier.`;
@@ -150,6 +154,7 @@ export function optionValueLabel(spec: OptionSpec): string {
   if (spec.format === 'email') return '<email>';
   if (spec.format === 'board-key') return '<BOARD>';
   if (spec.format === 'ticket-key') return '<BOARD-123>';
+  if (spec.format === 'object-id') return '<object-id>';
   if (spec.type === 'integer') return '<integer>';
   if (spec.type === 'number') return '<number>';
   if (spec.type === 'boolean') return '<true|false>';
@@ -163,16 +168,20 @@ export function optionConstraints(spec: OptionSpec): string[] {
   return [
     ...(spec.choices?.length ? [`enum: ${spec.choices.join(', ')}`] : []),
     ...(spec.numericChoices?.length ? [`enum: ${spec.numericChoices.join(', ')}`] : []),
+    ...(spec.itemChoices?.length ? [`item enum: ${spec.itemChoices.join(', ')}`] : []),
     ...(spec.format ? [`format: ${spec.format}`] : []),
     ...(spec.min !== undefined ? [`min: ${spec.min}`] : []),
     ...(spec.max !== undefined ? [`max: ${spec.max}`] : []),
     ...(spec.maxLength !== undefined ? [`max length: ${spec.maxLength}`] : []),
     ...(spec.maxItems !== undefined ? [`max items: ${spec.maxItems}`] : []),
     ...(spec.uniqueItems ? ['unique values'] : []),
+    ...(spec.jsonSchema ? [`JSON schema: ${JSON.stringify(spec.jsonSchema)}`] : []),
+    ...(spec.example ? [`example: ${spec.example}`] : []),
   ];
 }
 
 function sampleFor(name: string, spec: Partial<OptionSpec>): string {
+  if (spec.example) return shellQuote(spec.example);
   if (spec.choices?.length) return spec.choices[0]!;
   if (spec.numericChoices?.length) return String(spec.numericChoices[0]!);
   if (spec.format === 'date') return '2026-07-25';
@@ -182,13 +191,14 @@ function sampleFor(name: string, spec: Partial<OptionSpec>): string {
   if (spec.format === 'email') return 'user@example.com';
   if (spec.format === 'board-key') return 'OPS';
   if (spec.format === 'ticket-key') return 'OPS-42';
+  if (spec.format === 'object-id') return '507f1f77bcf86cd799439011';
   if (spec.type === 'boolean') return 'true';
   if (spec.type === 'integer' || spec.type === 'number') return String(Math.max(1, spec.min ?? 1));
   if (spec.type === 'json-object') return "'{}'";
   if (spec.type === 'json-array') return "'[]'";
   if (spec.type === 'csv') {
     if (name === 'projects') return 'Project-A,Project-B';
-    if (name.includes('permission')) return 'projects.read,time.read';
+    if (spec.itemChoices?.length) return spec.itemChoices.slice(0, 2).join(',');
     return 'value-1,value-2';
   }
   if (name.endsWith('-date')) return '2026-07-25';
@@ -201,6 +211,10 @@ function sampleFor(name: string, spec: Partial<OptionSpec>): string {
   if (name.endsWith('-key')) return `${name.slice(0, -4).replace(/-/g, '_')}_key`;
   if (name === 'id') return 'resource_123';
   return 'example-value';
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function humanize(value: string): string {

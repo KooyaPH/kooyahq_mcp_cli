@@ -13,7 +13,7 @@ import { formatOutput } from '../output/format.js';
 import { helpText } from './help.js';
 import { skillOutput } from './skill.js';
 const DEFAULT_ALL_PAGES_LIMITS = {
-    maxPages: 1_000,
+    maxPages: 100,
     maxItems: 100_000,
     maxBytes: 50 * 1024 * 1024,
 };

@@ -19,7 +19,18 @@ const budgetBody = {
   'end-date': { apiName: 'endDate', format: 'date' as const },
   amount: { apiName: 'amount', type: 'number' as const, min: 0.01 },
   currency: { apiName: 'currency', maxLength: 3 },
-  'alert-thresholds-json': { apiName: 'alertThresholds', type: 'json-object' as const },
+  'alert-thresholds-json': {
+    apiName: 'alertThresholds',
+    type: 'json-object' as const,
+    jsonSchema: {
+      type: 'object',
+      properties: {
+        warning: { type: 'number', minimum: 0, maximum: 100 },
+        critical: { type: 'number', minimum: 0, maximum: 100 },
+      },
+    },
+    example: '{"warning":75,"critical":90}',
+  },
 };
 
 export const analyticsCommands: CommandSpec[] = [

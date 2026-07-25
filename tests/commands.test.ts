@@ -57,10 +57,10 @@ test('maps CRUD path parameters and safely encodes path segments', () => {
     warnings: ['Positional <id> is deprecated; use --project-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'members', 'update-role', 'board-1', 'user@example.com', '--role', 'admin',
+    'boards', 'members', 'update-role', '507f1f77bcf86cd799439011', 'user@example.com', '--role', 'admin',
   ]), {
     method: 'PATCH',
-    path: '/boards/board-1/members',
+    path: '/boards/507f1f77bcf86cd799439011/members',
     query: {},
     body: { userId: 'user@example.com', role: 'admin' },
     output: 'table',
@@ -72,9 +72,9 @@ test('maps CRUD path parameters and safely encodes path segments', () => {
 });
 
 test('uses explicit board selectors and preserves the positional id as a deprecated alias', () => {
-  assert.deepEqual(buildRequest(commandCatalog, ['boards', 'get', '--board-id', 'board / one']), {
+  assert.deepEqual(buildRequest(commandCatalog, ['boards', 'get', '--board-id', '507f1f77bcf86cd799439011']), {
     method: 'GET',
-    path: '/boards/board%20%2F%20one',
+    path: '/boards/507f1f77bcf86cd799439011',
     query: {},
     output: 'table',
   });
@@ -84,15 +84,15 @@ test('uses explicit board selectors and preserves the positional id as a depreca
     query: {},
     output: 'table',
   });
-  assert.deepEqual(buildRequest(commandCatalog, ['boards', 'get', 'board-1']), {
+  assert.deepEqual(buildRequest(commandCatalog, ['boards', 'get', '507f1f77bcf86cd799439011']), {
     method: 'GET',
-    path: '/boards/board-1',
+    path: '/boards/507f1f77bcf86cd799439011',
     query: {},
     output: 'table',
     warnings: ['Positional <id> is deprecated; use --board-id.'],
   });
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'get', '--board-id', 'board-1', '--board-key', 'OPS']),
+    () => buildRequest(commandCatalog, ['boards', 'get', '--board-id', '507f1f77bcf86cd799439011', '--board-key', 'OPS']),
     /exactly one of --board-id or --board-key/,
   );
   assert.throws(
@@ -121,7 +121,7 @@ test('requires an exact board id or key for board-scoped ticket lists and create
   });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'create', '--board-id', 'board-1', '--board-key', 'OPS',
+      'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--board-key', 'OPS',
       '--ticket-type', 'task', '--title', 'Release',
     ]),
     /exactly one of --board-id or --board-key/,
@@ -159,14 +159,14 @@ test('uses explicit resource selectors across projects, tickets, time, users, an
 });
 
 test('aligns favorite and member mutations with the backend body contract', () => {
-  assert.deepEqual(buildRequest(commandCatalog, ['boards', 'favorite', 'board-1']), {
-    method: 'POST', path: '/boards/board-1/favorite', query: {}, output: 'table',
+  assert.deepEqual(buildRequest(commandCatalog, ['boards', 'favorite', '507f1f77bcf86cd799439011']), {
+    method: 'POST', path: '/boards/507f1f77bcf86cd799439011/favorite', query: {}, output: 'table',
     warnings: ['Positional <id> is deprecated; use --board-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'members', 'remove', 'board-1', 'user-1', '--yes',
+    'boards', 'members', 'remove', '507f1f77bcf86cd799439011', 'user-1', '--yes',
   ]), {
-    method: 'DELETE', path: '/boards/board-1/members', query: {}, body: { userId: 'user-1' }, output: 'table',
+    method: 'DELETE', path: '/boards/507f1f77bcf86cd799439011/members', query: {}, body: { userId: 'user-1' }, output: 'table',
     warnings: [
       'Positional <boardId> is deprecated; use --board-id.',
       'Positional <userId> is deprecated; use --user-id.',
@@ -177,13 +177,13 @@ test('aligns favorite and member mutations with the backend body contract', () =
 test('allowlists and URL-encodes list filters, sort, and pagination', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'list', '--page', '2', '--limit', '50', '--sort', 'createdAt', '--order', 'desc',
-    '--search', 'red & blue', '--board-id', 'board 1', '--column-id', 'in progress', '--output', 'json',
+    '--search', 'red & blue', '--board-id', '507f1f77bcf86cd799439011', '--column-id', 'in progress', '--output', 'json',
   ]), {
     method: 'GET',
     path: '/tickets',
     query: {
       page: 2, limit: 50, sortBy: 'createdAt', sortOrder: 'desc', search: 'red & blue',
-      boardId: 'board 1', columnId: 'in progress',
+      boardId: '507f1f77bcf86cd799439011', columnId: 'in progress',
     },
     output: 'json',
   });
@@ -199,10 +199,10 @@ test('allowlists and URL-encodes list filters, sort, and pagination', () => {
 
 test('preserves every equals sign in an inline option value', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'search', '--query=alpha=beta=gamma', '--board-id=board-1',
+    'tickets', 'search', '--query=alpha=beta=gamma', '--board-id=507f1f77bcf86cd799439011',
   ]).query, {
     q: 'alpha=beta=gamma',
-    boardId: 'board-1',
+    boardId: '507f1f77bcf86cd799439011',
   });
 });
 
@@ -230,15 +230,15 @@ test('maps backend-specific whoami, timer, ticket, comment, and analytics contra
     warnings: ['Positional <id> is deprecated; use --timer-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'update', 'ticket-1', '--column-id', 'column-2',
+    'tickets', 'update', '507f1f77bcf86cd799439012', '--column-id', 'column-2',
   ]), {
-    method: 'PATCH', path: '/tickets/ticket-1', query: {}, body: { columnId: 'column-2' }, output: 'table',
+    method: 'PATCH', path: '/tickets/507f1f77bcf86cd799439012', query: {}, body: { columnId: 'column-2' }, output: 'table',
     warnings: ['Positional <id> is deprecated; use --ticket-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'comments', 'create', 'ticket-1', '--content', 'Ready',
+    'tickets', 'comments', 'create', '507f1f77bcf86cd799439012', '--content', 'Ready',
   ]), {
-    method: 'POST', path: '/tickets/ticket-1/comments', query: {}, body: { content: 'Ready' }, output: 'table',
+    method: 'POST', path: '/tickets/507f1f77bcf86cd799439012/comments', query: {}, body: { content: 'Ready' }, output: 'table',
     warnings: ['Positional <ticketId> is deprecated; use --ticket-id.'],
   });
   assert.deepEqual(buildRequest(commandCatalog, [
@@ -288,11 +288,11 @@ test('enforces and maps the board create/update contracts', () => {
     /requires --type/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'update', 'board-1', '--type', 'kanban']),
+    () => buildRequest(commandCatalog, ['boards', 'update', '507f1f77bcf86cd799439011', '--type', 'kanban']),
     /Unknown option --type/,
   );
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'settings', 'update', 'board-1', '--default-view', 'list', '--show-swimlanes', 'true',
+    'boards', 'settings', 'update', '507f1f77bcf86cd799439011', '--default-view', 'list', '--show-swimlanes', 'true',
   ]).body, { defaultView: 'list', showSwimlanes: true });
 });
 
@@ -306,48 +306,48 @@ test('maps board workflow commands with explicit selectors and semantic mutation
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'columns', 'add', '--board-id', 'board-1', '--name', 'Review',
+    'boards', 'columns', 'add', '--board-id', '507f1f77bcf86cd799439011', '--name', 'Review',
     '--color', '#2563eb', '--wip-limit', '4', '--done', 'false',
   ]), {
     method: 'POST',
-    path: '/boards/board-1/columns',
+    path: '/boards/507f1f77bcf86cd799439011/columns',
     query: {},
     body: { name: 'Review', color: '#2563eb', wipLimit: 4, isDone: false },
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'columns', 'move', '--board-id', 'board-1', '--column-id', 'column-2',
+    'boards', 'columns', 'move', '--board-id', '507f1f77bcf86cd799439011', '--column-id', 'column-2',
     '--before-column-id', 'column-1',
   ]), {
     method: 'PATCH',
-    path: '/boards/board-1/columns/column-2/move',
+    path: '/boards/507f1f77bcf86cd799439011/columns/column-2/move',
     query: {},
     body: { beforeColumnId: 'column-1' },
     output: 'table',
   });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'boards', 'columns', 'move', '--board-id', 'board-1', '--column-id', 'column-2',
+      'boards', 'columns', 'move', '--board-id', '507f1f77bcf86cd799439011', '--column-id', 'column-2',
       '--first', '--last',
     ]),
     /exactly one of/,
   );
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'columns', 'remove', '--board-id', 'board-1', '--column-id', 'column-2',
+    'boards', 'columns', 'remove', '--board-id', '507f1f77bcf86cd799439011', '--column-id', 'column-2',
     '--move-tickets-to', 'column-1', '--yes',
   ]), {
     method: 'DELETE',
-    path: '/boards/board-1/columns/column-2',
+    path: '/boards/507f1f77bcf86cd799439011/columns/column-2',
     query: {},
     body: { moveTicketsToColumnId: 'column-1' },
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'settings', 'fields', 'set', '--board-id', 'board-1',
+    'boards', 'settings', 'fields', 'set', '--board-id', '507f1f77bcf86cd799439011',
     '--field', 'priority', '--visible', 'false', '--order', '2',
   ]).body, { field: 'priority', visible: false, order: 2 });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'automation', 'add', '--board-id', 'board-1', '--status', 'deployed',
+    'boards', 'automation', 'add', '--board-id', '507f1f77bcf86cd799439011', '--status', 'deployed',
     '--target-branch', 'main', '--column-id', 'done', '--enabled', 'true',
   ]).body, {
     status: 'deployed', targetBranch: 'main', columnId: 'done', enabled: true,
@@ -356,29 +356,29 @@ test('maps board workflow commands with explicit selectors and semantic mutation
 
 test('enforces and maps ticket JSON, array, and required fields', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'create', '--board-id', 'board-1', '--ticket-type', 'task', '--title', 'Ship',
+    'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task', '--title', 'Ship',
     '--description-json', '{"type":"doc"}', '--acceptance-criteria-json', '[{"text":"Verified"}]',
     '--tags', 'release, urgent', '--points', '3', '--parent-ticket-key', 'OPS-7',
-    '--root-epic-id', 'ticket-epic-1',
+    '--root-epic-id', '507f1f77bcf86cd799439014',
   ]), {
     method: 'POST', path: '/tickets', query: {},
     body: {
-      boardId: 'board-1', ticketType: 'task', title: 'Ship', description: { type: 'doc' },
+      boardId: '507f1f77bcf86cd799439011', ticketType: 'task', title: 'Ship', description: { type: 'doc' },
       acceptanceCriteria: [{ text: 'Verified' }], tags: ['release', 'urgent'], points: 3,
-      parentTicketKey: 'OPS-7', rootEpicId: 'ticket-epic-1',
+      parentTicketKey: 'OPS-7', rootEpicId: '507f1f77bcf86cd799439014',
     },
     output: 'table',
   });
   assert.throws(
-    () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', 'board-1', '--title', 'Missing']),
+    () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--title', 'Missing']),
     /requires --ticket-type/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', 'b', '--ticket-type', 'task', '--title', 'x', '--description-json', 'not-json']),
+    () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task', '--title', 'x', '--description-json', 'not-json']),
     /valid JSON object/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', 'b', '--ticket-type', 'task', '--title', 'x', '--acceptance-criteria-json', '{"text":"wrong shape"}']),
+    () => buildRequest(commandCatalog, ['tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task', '--title', 'x', '--acceptance-criteria-json', '{"text":"wrong shape"}']),
     /valid JSON array/,
   );
   assert.throws(
@@ -387,7 +387,7 @@ test('enforces and maps ticket JSON, array, and required fields', () => {
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'create', '--board-id', 'board-1', '--ticket-type', 'task',
+      'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'task',
       '--title', 'Task', '--points', '4',
     ]),
     /--points must be 1, 2, 3, 5, 8, 13/,
@@ -396,7 +396,7 @@ test('enforces and maps ticket JSON, array, and required fields', () => {
 
 test('uses explicit clear flags and rejects conflicting set-and-clear options', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'update', '--ticket-id', 'ticket-1',
+    'tickets', 'update', '--ticket-id', '507f1f77bcf86cd799439012',
     '--clear-assignee', '--clear-due-date', '--clear-description', '--clear-tags',
   ]).body, {
     assigneeId: null,
@@ -406,13 +406,13 @@ test('uses explicit clear flags and rejects conflicting set-and-clear options', 
   });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'update', '--ticket-id', 'ticket-1',
+      'tickets', 'update', '--ticket-id', '507f1f77bcf86cd799439012',
       '--assignee-id', 'user-1', '--clear-assignee',
     ]),
     /at most one of --assignee-id or --clear-assignee/,
   );
   assert.deepEqual(buildRequest(commandCatalog, [
-    'boards', 'settings', 'update', '--board-id', 'board-1', '--clear-description',
+    'boards', 'settings', 'update', '--board-id', '507f1f77bcf86cd799439011', '--clear-description',
   ]).body, { description: null });
 });
 
@@ -426,24 +426,24 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'move', '--ticket-id', 'ticket-1', '--column-id', 'column-2',
+    'tickets', 'move', '--ticket-id', '507f1f77bcf86cd799439012', '--column-id', 'column-2',
     '--after-ticket-key', 'OPS-9',
   ]), {
     method: 'PATCH',
-    path: '/tickets/ticket-1/move',
+    path: '/tickets/507f1f77bcf86cd799439012/move',
     query: {},
     body: { columnId: 'column-2', afterTicketKey: 'OPS-9' },
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'parent', 'set', '--ticket-id', 'ticket-1', '--parent-ticket-key', 'OPS-1',
+    'tickets', 'parent', 'set', '--ticket-id', '507f1f77bcf86cd799439012', '--parent-ticket-key', 'OPS-1',
   ]).body, { parentTicketKey: 'OPS-1' });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'criteria', 'set', '--ticket-id', 'ticket-1',
+    'tickets', 'criteria', 'set', '--ticket-id', '507f1f77bcf86cd799439012',
     '--criterion-id', 'criterion-1', '--completed', 'true',
   ]).body, { completed: true });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'documents', 'add', '--ticket-id', 'ticket-1', '--type', 'figma',
+    'tickets', 'documents', 'add', '--ticket-id', '507f1f77bcf86cd799439012', '--type', 'figma',
     '--url', 'https://www.figma.com/design/abc', '--name', 'Design',
   ]).body, { type: 'figma', url: 'https://www.figma.com/design/abc', name: 'Design' });
   assert.deepEqual(buildRequest(commandCatalog, [
@@ -457,21 +457,21 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'blockers', 'add', '--ticket-id', 'ticket-1', '--blocker-ticket-key', 'OPS-2',
+    'tickets', 'blockers', 'add', '--ticket-id', '507f1f77bcf86cd799439012', '--blocker-ticket-key', 'OPS-2',
   ]).body, { blockerTicketKey: 'OPS-2' });
   assert.deepEqual(buildRequest(commandCatalog, [
-    'tickets', 'development', 'set', '--ticket-id', 'ticket-1',
+    'tickets', 'development', 'set', '--ticket-id', '507f1f77bcf86cd799439012',
     '--branch', 'feature/release', '--status', 'pull-requested',
     '--pull-request-url', 'https://github.com/KooyaPH/repo/pull/1',
   ]).body, {
-    branch: 'feature/release',
+    branchName: 'feature/release',
     status: 'pull-requested',
     pullRequestUrl: 'https://github.com/KooyaPH/repo/pull/1',
   });
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'relations', 'add', '--ticket-id', 'ticket-1',
-      '--related-ticket-id', 'ticket-2', '--related-ticket-key', 'OPS-2',
+      'tickets', 'relations', 'add', '--ticket-id', '507f1f77bcf86cd799439012',
+      '--related-ticket-id', '507f1f77bcf86cd799439013', '--related-ticket-key', 'OPS-2',
     ]),
     /exactly one of --related-ticket-id or --related-ticket-key/,
   );
@@ -479,7 +479,7 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
     'tickets', 'improve', '--ticket-key', 'OPS-42', '--user-command', 'Focus on rollback safety',
   ]).body, { userCommand: 'Focus on rollback safety' });
   assert.throws(
-    () => buildRequest(commandCatalog, ['tickets', 'improve', '--ticket-id', 'ticket-1', '--instructions', 'rewrite']),
+    () => buildRequest(commandCatalog, ['tickets', 'improve', '--ticket-id', '507f1f77bcf86cd799439012', '--instructions', 'rewrite']),
     /Unknown option --instructions/,
   );
   assert.deepEqual(buildRequest(commandCatalog, [
@@ -496,28 +496,28 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
 test('requires unambiguous hierarchy, move anchor, and document selectors', () => {
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'create', '--board-id', 'board-1', '--ticket-type', 'subtask', '--title', 'Child',
-      '--parent-ticket-id', 'ticket-1', '--parent-ticket-key', 'OPS-1',
+      'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011', '--ticket-type', 'subtask', '--title', 'Child',
+      '--parent-ticket-id', '507f1f77bcf86cd799439012', '--parent-ticket-key', 'OPS-1',
     ]),
     /at most one of --parent-ticket-id or --parent-ticket-key/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'move', '--ticket-id', 'ticket-1', '--column-id', 'column-2',
-      '--before-ticket-id', 'ticket-2', '--before-ticket-key', 'OPS-2',
+      'tickets', 'move', '--ticket-id', '507f1f77bcf86cd799439012', '--column-id', 'column-2',
+      '--before-ticket-id', '507f1f77bcf86cd799439013', '--before-ticket-key', 'OPS-2',
     ]),
     /exactly one of/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'documents', 'add', '--ticket-id', 'ticket-1',
+      'tickets', 'documents', 'add', '--ticket-id', '507f1f77bcf86cd799439012',
       '--type', 'doc', '--url', 'https://example.com/spec',
     ]),
     /requires --name/,
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'documents', 'remove', '--ticket-id', 'ticket-1', '--document-id', 'invented',
+      'tickets', 'documents', 'remove', '--ticket-id', '507f1f77bcf86cd799439012', '--document-id', 'invented',
     ]),
     /Unknown option --document-id/,
   );
@@ -526,7 +526,7 @@ test('requires unambiguous hierarchy, move anchor, and document selectors', () =
 test('rejects unsafe URLs, invalid ranges, and oversized timer batches locally', () => {
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'documents', 'add', '--ticket-id', 'ticket-1',
+      'tickets', 'documents', 'add', '--ticket-id', '507f1f77bcf86cd799439012',
       '--type', 'other', '--url', 'http://example.com/reference', '--name', 'Reference',
     ]),
     /HTTPS URL/,
@@ -741,15 +741,15 @@ test('maps frontend cost analytics reads and budget management actions', () => {
 
 test('requires board member identity and role locally', () => {
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'members', 'add', 'board-1', '--user-id', 'user-1']),
+    () => buildRequest(commandCatalog, ['boards', 'members', 'add', '507f1f77bcf86cd799439011', '--user-id', 'user-1']),
     /requires --role/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'members', 'add', 'board-1', '--role', 'admin']),
+    () => buildRequest(commandCatalog, ['boards', 'members', 'add', '507f1f77bcf86cd799439011', '--role', 'admin']),
     /requires --user-id/,
   );
   assert.throws(
-    () => buildRequest(commandCatalog, ['boards', 'members', 'update-role', 'board-1', 'user-1']),
+    () => buildRequest(commandCatalog, ['boards', 'members', 'update-role', '507f1f77bcf86cd799439011', 'user-1']),
     /requires --role/,
   );
 });
@@ -790,7 +790,7 @@ test('applies endpoint-specific sort allowlists and selector validation', () => 
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'assigned', '--board-id', 'board-1', '--board-key', 'OPS',
+      'tickets', 'assigned', '--board-id', '507f1f77bcf86cd799439011', '--board-key', 'OPS',
     ]),
     /at most one of --board-id or --board-key/,
   );
@@ -800,7 +800,7 @@ test('applies endpoint-specific sort allowlists and selector validation', () => 
   );
   assert.throws(
     () => buildRequest(commandCatalog, [
-      'tickets', 'search', '--query', 'release', '--board-id', 'board-1', '--board-key', 'OPS',
+      'tickets', 'search', '--query', 'release', '--board-id', '507f1f77bcf86cd799439011', '--board-key', 'OPS',
     ]),
     /at most one of --board-id or --board-key/,
   );
@@ -863,7 +863,7 @@ test('validates endpoint URLs and board keys before sending requests', () => {
     /HTTPS URL/,
   );
   for (const command of [
-    ['tickets', 'improve-draft', '--board-key', 'OPS!', '--draft-json', '{}'],
+    ['tickets', 'improve-draft', '--board-key', 'OPS!', '--title', 'Draft'],
     ['tickets', 'import', 'preview', '--board-key', 'OPS!', '--stdin'],
   ]) {
     assert.throws(() => buildRequest(commandCatalog, command), /alphanumeric board key/);
@@ -896,5 +896,118 @@ test('maps user WhatsApp and explicit permission clearing without ambiguous empt
       '--permissions', 'boards.read', '--clear-permissions',
     ]),
     /at most one of --permissions or --clear-permissions/,
+  );
+});
+
+test('requires real ObjectId selectors and a parent for subtasks', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, ['boards', 'get', '--board-id', 'board-1']),
+    /24-character hexadecimal ObjectId/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['tickets', 'get', '--ticket-id', 'ticket-1']),
+    /24-character hexadecimal ObjectId/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'move', '--ticket-id', '507f1f77bcf86cd799439012',
+      '--column-id', 'column-2', '--before-ticket-id', 'ticket-2',
+    ]),
+    /24-character hexadecimal ObjectId/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011',
+      '--ticket-type', 'subtask', '--title', 'Child',
+    ]),
+    /subtask.*exactly one of --parent-ticket-id or --parent-ticket-key/i,
+  );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'create', '--board-id', '507f1f77bcf86cd799439011',
+    '--ticket-type', 'subtask', '--title', 'Child', '--parent-ticket-key', 'OPS-42',
+  ]).body, {
+    boardId: '507f1f77bcf86cd799439011', ticketType: 'subtask', title: 'Child',
+    parentTicketKey: 'OPS-42',
+  });
+});
+
+test('maps the flattened improve and development contracts', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'improve-draft', '--board-key', 'OPS', '--title', 'Release',
+    '--description-json', '{"type":"doc","content":[]}',
+    '--acceptance-criteria-json', '[{"text":"Verified"}]', '--ticket-type', 'task',
+    '--user-command', 'Focus on rollback',
+  ]).body, {
+    boardKey: 'OPS', title: 'Release', description: { type: 'doc', content: [] },
+    acceptanceCriteria: [{ text: 'Verified' }], ticketType: 'task',
+    userCommand: 'Focus on rollback',
+  });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['tickets', 'improve-draft', '--board-key', 'OPS']),
+    /requires --title/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'improve', '--ticket-key', 'OPS-42', '--user-command', 'x'.repeat(2001),
+    ]),
+    /at most 2000 characters/,
+  );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'development', 'set', '--ticket-key', 'OPS-42', '--branch', 'feature/release',
+  ]).body, { branchName: 'feature/release' });
+});
+
+test('validates permission list items against the backend permission catalog', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'users', 'permissions', 'update', '--user-id', 'user-1',
+    '--permissions', 'users:view,projects:manage',
+  ]).body, { permissions: ['users:view', 'projects:manage'] });
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'users', 'permissions', 'update', '--user-id', 'user-1',
+      '--permissions', 'users:view,projects.read',
+    ]),
+    /--permissions contains unsupported value projects\.read/,
+  );
+});
+
+test('uses backend list limits and endpoint-specific sort fields', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, ['projects', 'list', '--page', '101']),
+    /integer from 1 to 100/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['projects', 'list', '--limit', '101']),
+    /integer from 1 to 100/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'boards', 'activities', 'list', '--board-key', 'OPS', '--sort', 'occurredAt',
+    ]),
+    /--sort must be createdAt/,
+  );
+  assert.equal(buildRequest(commandCatalog, [
+    'boards', 'activities', 'list', '--board-key', 'OPS', '--sort', 'createdAt',
+  ]).query.sortBy, 'createdAt');
+  assert.equal(buildRequest(commandCatalog, [
+    'users', 'templates', 'list', '--sort', 'label',
+  ]).query.sortBy, 'label');
+  assert.throws(
+    () => buildRequest(commandCatalog, ['users', 'templates', 'list', '--sort', 'name']),
+    /--sort must be id or label/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['projects', 'list', '--all', '--page', '2']),
+    /Do not combine --all with --page/,
+  );
+});
+
+test('requires HTTPS for resource URLs even when localhost is used', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'documents', 'add', '--ticket-key', 'OPS-42', '--name', 'Local',
+      '--type', 'doc', '--url', 'http://localhost:3000/spec',
+    ]),
+    /HTTPS URL/,
   );
 });

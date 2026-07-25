@@ -5,8 +5,8 @@ export function listQuery(
   sortableFields: string[] = ['createdAt', 'updatedAt'],
 ): Record<string, OptionSpec> {
   return {
-    page: { apiName: 'page', type: 'integer' },
-    limit: { apiName: 'limit', type: 'integer' },
+    page: { apiName: 'page', type: 'integer', max: 100 },
+    limit: { apiName: 'limit', type: 'integer', max: 100 },
     sort: { apiName: 'sortBy', choices: sortableFields },
     order: { apiName: 'sortOrder', choices: ['asc', 'desc'] },
     ...filters,

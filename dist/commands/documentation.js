@@ -102,6 +102,9 @@ export function commandExamples(command) {
     if (command.fileInput)
         parts.push('--file', 'tickets.json');
     const invocation = parts.join(' ');
+    if (command.name === 'users permissions update') {
+        return [`${invocation} --dry-run --output json`];
+    }
     return command.method === 'GET'
         ? [invocation, `${invocation} --output json`]
         : [`${invocation} --dry-run --output json`, invocation];
@@ -121,6 +124,7 @@ export function optionDescription(name, location) {
         stdin: 'Read the bounded ticket import payload from standard input.',
         format: 'Input or output representation accepted by this command.',
         direction: 'Blocker relationship direction; defaults to all.',
+        permissions: 'Comma-separated permissions from the current backend catalog; discover templates with `kooyahq users templates list --output json`.',
     };
     if (descriptions[name])
         return descriptions[name];
@@ -154,6 +158,8 @@ export function optionValueLabel(spec) {
         return '<BOARD>';
     if (spec.format === 'ticket-key')
         return '<BOARD-123>';
+    if (spec.format === 'object-id')
+        return '<object-id>';
     if (spec.type === 'integer')
         return '<integer>';
     if (spec.type === 'number')
@@ -172,15 +178,20 @@ export function optionConstraints(spec) {
     return [
         ...(spec.choices?.length ? [`enum: ${spec.choices.join(', ')}`] : []),
         ...(spec.numericChoices?.length ? [`enum: ${spec.numericChoices.join(', ')}`] : []),
+        ...(spec.itemChoices?.length ? [`item enum: ${spec.itemChoices.join(', ')}`] : []),
         ...(spec.format ? [`format: ${spec.format}`] : []),
         ...(spec.min !== undefined ? [`min: ${spec.min}`] : []),
         ...(spec.max !== undefined ? [`max: ${spec.max}`] : []),
         ...(spec.maxLength !== undefined ? [`max length: ${spec.maxLength}`] : []),
         ...(spec.maxItems !== undefined ? [`max items: ${spec.maxItems}`] : []),
         ...(spec.uniqueItems ? ['unique values'] : []),
+        ...(spec.jsonSchema ? [`JSON schema: ${JSON.stringify(spec.jsonSchema)}`] : []),
+        ...(spec.example ? [`example: ${spec.example}`] : []),
     ];
 }
 function sampleFor(name, spec) {
+    if (spec.example)
+        return shellQuote(spec.example);
     if (spec.choices?.length)
         return spec.choices[0];
     if (spec.numericChoices?.length)
@@ -199,6 +210,8 @@ function sampleFor(name, spec) {
         return 'OPS';
     if (spec.format === 'ticket-key')
         return 'OPS-42';
+    if (spec.format === 'object-id')
+        return '507f1f77bcf86cd799439011';
     if (spec.type === 'boolean')
         return 'true';
     if (spec.type === 'integer' || spec.type === 'number')
@@ -210,8 +223,8 @@ function sampleFor(name, spec) {
     if (spec.type === 'csv') {
         if (name === 'projects')
             return 'Project-A,Project-B';
-        if (name.includes('permission'))
-            return 'projects.read,time.read';
+        if (spec.itemChoices?.length)
+            return spec.itemChoices.slice(0, 2).join(',');
         return 'value-1,value-2';
     }
     if (name.endsWith('-date'))
@@ -233,6 +246,9 @@ function sampleFor(name, spec) {
     if (name === 'id')
         return 'resource_123';
     return 'example-value';
+}
+function shellQuote(value) {
+    return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 function humanize(value) {
     return value.replace(/-/g, ' ');
