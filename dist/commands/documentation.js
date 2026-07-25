@@ -1,3 +1,13 @@
+const MONGO_OBJECT_ID_EXAMPLE_FLAGS = new Set([
+    'assignee-id',
+    'budget-id',
+    'comment-id',
+    'entry-id',
+    'notification-id',
+    'project-id',
+    'timer-id',
+    'user-id',
+]);
 const DOMAIN_WORKFLOWS = {
     auth: 'Verify the configured access key before using protected resources.',
     projects: 'List or create projects, then use their IDs when tracking time or organizing work.',
@@ -223,8 +233,11 @@ function sampleFor(name, spec) {
     if (spec.type === 'csv') {
         if (name === 'projects')
             return 'Project-A,Project-B';
-        if (spec.itemChoices?.length)
-            return spec.itemChoices.slice(0, 2).join(',');
+        if (spec.itemChoices?.length) {
+            const preferred = ['projects:view', 'board:view']
+                .filter((value) => spec.itemChoices.includes(value));
+            return (preferred.length > 0 ? preferred : spec.itemChoices.slice(0, 2)).join(',');
+        }
         return 'value-1,value-2';
     }
     if (name.endsWith('-date'))
@@ -239,6 +252,8 @@ function sampleFor(name, spec) {
         return 'OPS';
     if (name === 'ticket-key' || name.endsWith('-ticket-key'))
         return 'OPS-42';
+    if (MONGO_OBJECT_ID_EXAMPLE_FLAGS.has(name))
+        return '507f1f77bcf86cd799439011';
     if (name.endsWith('-id'))
         return `${name.slice(0, -3).replace(/-/g, '_')}_123`;
     if (name.endsWith('-key'))

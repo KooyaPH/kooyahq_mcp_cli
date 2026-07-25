@@ -340,9 +340,9 @@ Examples:
 
 ```sh
 kooyahq boards get --board-key OPS --output json
-kooyahq boards members add --board-key OPS --user-id user_123 --role member --dry-run
-kooyahq tickets list --board-key OPS --assignee-id user_123 --sort createdAt --order desc --all --output json
-kooyahq tickets create --board-key OPS --ticket-type task --title "Release" --assignee-id user_123 --dry-run
+kooyahq boards members add --board-key OPS --user-id 507f1f77bcf86cd799439011 --role member --dry-run
+kooyahq tickets list --board-key OPS --assignee-id 507f1f77bcf86cd799439011 --sort createdAt --order desc --all --output json
+kooyahq tickets create --board-key OPS --ticket-type task --title "Release" --assignee-id 507f1f77bcf86cd799439011 --dry-run
 kooyahq tickets create --board-key OPS --ticket-type subtask --title "Release test" --parent-ticket-key OPS-42 --root-epic-key OPS-1 --dry-run
 kooyahq tickets improve --ticket-key OPS-42 --user-command "Focus on rollback safety" --output json
 kooyahq tickets documents add --ticket-key OPS-42 --name "Release plan" --type doc --url https://example.com/release-plan
@@ -350,11 +350,11 @@ kooyahq tickets documents remove --ticket-key OPS-42 --url https://example.com/r
 kooyahq tickets blockers list --ticket-key OPS-42 --direction blocked-by --output json
 kooyahq tickets blockers add --ticket-key OPS-42 --blocker-ticket-key OPS-12
 kooyahq time timers start-many --projects Project-A,Project-B --task "Review"
-kooyahq time entries list --scope team --user-id user_123 --start-date 2026-07-01 --end-date 2026-07-25 --output json
+kooyahq time entries list --scope team --user-id 507f1f77bcf86cd799439011 --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq analytics team --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq notifications list --unread-only true --all --output json
 kooyahq users list --search "Alex" --all --output json
-kooyahq users update --user-id user_123 --clear-whatsapp-phone --clear-permissions --dry-run
+kooyahq users update --user-id 507f1f77bcf86cd799439011 --clear-whatsapp-phone --clear-permissions --dry-run
 ```
 
 ## Authorization, auditing, and security

@@ -12,19 +12,26 @@ const GITHUB_STATUSES = [
 ];
 const BOARD_COLUMNS_SCHEMA = {
   type: 'array',
+  maxItems: 100,
   items: {
     type: 'object',
-    required: ['name'],
+    additionalProperties: false,
+    required: ['id', 'name', 'order', 'isDoneColumn'],
     properties: {
-      name: { type: 'string' },
-      color: { type: 'string' },
-      isDone: { type: 'boolean' },
-      wipLimit: { type: 'integer', minimum: 0 },
+      id: {
+        type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_-]*$', maxLength: 100,
+      },
+      name: { type: 'string', minLength: 1, maxLength: 100 },
+      order: { type: 'integer', minimum: 0, maximum: 10_000 },
+      hexColor: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
+      wipLimit: { type: 'integer', minimum: 1, maximum: 10_000 },
+      isDoneColumn: { type: 'boolean' },
     },
   },
 };
 const BOARD_SETTINGS_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     defaultView: { type: 'string', enum: ['board', 'list', 'timeline'] },
     showSwimlanes: { type: 'boolean' },
@@ -89,7 +96,7 @@ const boardCreateBody = {
     apiName: 'columns',
     type: 'json-array' as const,
     jsonSchema: BOARD_COLUMNS_SCHEMA,
-    example: '[{"name":"Backlog","color":"#64748b","isDone":false}]',
+    example: '[{"id":"backlog","name":"Backlog","order":0,"hexColor":"#64748b","wipLimit":10,"isDoneColumn":false}]',
   },
   'settings-json': {
     apiName: 'settings',

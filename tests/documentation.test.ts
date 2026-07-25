@@ -107,6 +107,54 @@ test('every JSON option has structured schema, example metadata, and useful help
   );
 });
 
+test('board JSON skill mirrors the backend column and settings contracts', () => {
+  const document = JSON.parse(
+    skillOutput(['boards', 'create', '--output', 'json']),
+  ) as {
+    parameters: Array<{ name: string; jsonSchema?: unknown; example?: string }>;
+  };
+  const columns = document.parameters.find((parameter) => parameter.name === 'columns-json');
+  const settings = document.parameters.find((parameter) => parameter.name === 'settings-json');
+
+  assert.deepEqual(columns?.jsonSchema, {
+    type: 'array',
+    maxItems: 100,
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'name', 'order', 'isDoneColumn'],
+      properties: {
+        id: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_-]*$', maxLength: 100 },
+        name: { type: 'string', minLength: 1, maxLength: 100 },
+        order: { type: 'integer', minimum: 0, maximum: 10_000 },
+        hexColor: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
+        wipLimit: { type: 'integer', minimum: 1, maximum: 10_000 },
+        isDoneColumn: { type: 'boolean' },
+      },
+    },
+  });
+  assert.deepEqual(JSON.parse(columns?.example ?? 'null'), [{
+    id: 'backlog',
+    name: 'Backlog',
+    order: 0,
+    hexColor: '#64748b',
+    wipLimit: 10,
+    isDoneColumn: false,
+  }]);
+  assert.deepEqual(settings?.jsonSchema, {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      defaultView: { type: 'string', enum: ['board', 'list', 'timeline'] },
+      showSwimlanes: { type: 'boolean' },
+    },
+  });
+  assert.deepEqual(JSON.parse(settings?.example ?? 'null'), {
+    defaultView: 'board',
+    showSwimlanes: false,
+  });
+});
+
 test('permission mutation discovery is safe and points to current templates', () => {
   const document = JSON.parse(
     skillOutput(['users', 'permissions', 'update', '--output', 'json']),
@@ -118,9 +166,37 @@ test('permission mutation discovery is safe and points to current templates', ()
   assert.ok(permissions?.itemChoices?.includes('users:view'));
   assert.match(permissions?.description ?? '', /users templates list/);
   assert.ok(document.examples.every((example) => example.includes('--dry-run')));
-  assert.ok(document.examples.some((example) => example.includes('users:view')));
+  assert.ok(document.examples.some((example) => example.includes('projects:view,board:view')));
+  assert.ok(document.examples.every((example) => !example.includes('system:fullAccess')));
   assert.doesNotMatch(helpText(['users', 'permissions', 'update']), /projects\.read/);
   assert.match(helpText(['users', 'permissions', 'update']), /users templates list/);
+});
+
+test('generated examples use ObjectIds only for Mongo-backed entity identifiers', () => {
+  const examplesByCommand = new Map(
+    commandCatalog.map((command) => [command.name, commandExamples(command).join('\n')]),
+  );
+  const objectId = '507f1f77bcf86cd799439011';
+
+  for (const [command, flag] of [
+    ['projects get', 'project-id'],
+    ['boards members add', 'user-id'],
+    ['tickets comments update', 'comment-id'],
+    ['time timers add-task', 'timer-id'],
+    ['time entries get', 'entry-id'],
+    ['analytics costs budgets update', 'budget-id'],
+    ['users permissions update', 'user-id'],
+    ['notifications mark-read', 'notification-id'],
+  ] as const) {
+    assert.match(
+      examplesByCommand.get(command) ?? '',
+      new RegExp(`--${flag} ${objectId}`),
+      `${command} should use an ObjectId example for --${flag}`,
+    );
+  }
+
+  assert.match(examplesByCommand.get('boards columns update') ?? '', /--column-id column_123/);
+  assert.match(examplesByCommand.get('users templates get') ?? '', /--template-id template_123/);
 });
 
 test('subtask parent dependency is machine-readable and visible in help', () => {

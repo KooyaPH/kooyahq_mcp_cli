@@ -52,6 +52,7 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /users templates list --output json/);
   assert.match(readme, /--page.*--all.*cannot be combined/);
   assert.match(readme, /--description-json.*--acceptance-criteria-json/);
+  assert.doesNotMatch(readme, /\buser_123\b/);
   assert.doesNotMatch(readme, /global_prefix|globalPrefix|packagePath|binPath/);
 });
 
