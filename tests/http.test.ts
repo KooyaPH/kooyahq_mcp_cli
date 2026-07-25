@@ -98,6 +98,41 @@ test('times out requests with AbortController before surfacing a network error',
   assert.equal(capturedSignal?.aborted, true);
 });
 
+test('retries transient GET transport failures before surfacing a network error', async () => {
+  let calls = 0;
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0',
+    fetch: async () => {
+      calls += 1;
+      if (calls < 3) throw new Error('temporary timeout');
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+    retryDelayMs: 1,
+  });
+
+  await client.request('GET', '/projects');
+
+  assert.equal(calls, 3);
+});
+
+test('does not retry non-GET transport failures', async () => {
+  let calls = 0;
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0',
+    fetch: async () => {
+      calls += 1;
+      throw new Error('temporary timeout');
+    },
+    retryDelayMs: 1,
+  });
+
+  await assert.rejects(client.request('POST', '/projects', { body: { name: 'Internal' } }), /Unable to reach/);
+
+  assert.equal(calls, 1);
+});
+
 test('rejects oversized responses before parsing JSON', async () => {
   const client = new ApiClient({
     baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',

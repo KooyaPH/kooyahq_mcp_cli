@@ -8,6 +8,8 @@ import { validateBaseUrl } from '../config/url.js';
 export const API_ROOT = '/api/cli/v1';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+const DEFAULT_GET_RETRIES = 9;
+const DEFAULT_RETRY_DELAY_MS = 250;
 
 type QueryValue = string | number | boolean | string[] | undefined;
 
@@ -23,6 +25,7 @@ export interface ApiClientOptions extends Credentials {
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
   maxResponseBytes?: number;
+  retryDelayMs?: number;
 }
 
 export class ApiClient {
@@ -67,24 +70,22 @@ export class ApiClient {
       init.body = JSON.stringify(requestOptions.body);
     }
 
-    let response: Response;
-    let timeout: NodeJS.Timeout | undefined;
+    const attempts = method.toUpperCase() === 'GET' ? DEFAULT_GET_RETRIES + 1 : 1;
+    let response: Response | undefined;
     try {
-      response = await new Promise<Response>((resolve, reject) => {
-        timeout = setTimeout(() => {
-          controller.abort();
-          reject(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
-        }, this.timeoutMs);
-        const request = this.options.fetch
-          ? this.fetchImplementation(url, init)
-          : nodeHttpsRequest(url, method, headers, init.body);
-        void request.then(resolve, reject);
-      });
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          response = await this.sendWithTimeout(url, method, headers, init);
+          break;
+        } catch (error) {
+          if (attempt === attempts) throw error;
+          await delay(this.options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
+        }
+      }
     } catch {
       throw new NetworkError();
-    } finally {
-      if (timeout) clearTimeout(timeout);
     }
+    if (!response) throw new NetworkError();
     const payload = await parseResponse(response, this.maxResponseBytes);
     if (!response.ok) {
       throw new ApiError(
@@ -94,6 +95,35 @@ export class ApiClient {
     }
     return payload as T;
   }
+
+  private async sendWithTimeout(
+    url: URL,
+    method: string,
+    headers: Headers,
+    init: RequestInit,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    init.signal = controller.signal;
+    let timeout: NodeJS.Timeout | undefined;
+    try {
+      return await new Promise<Response>((resolve, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
+        }, this.timeoutMs);
+        const request = this.options.fetch
+          ? this.fetchImplementation(url, init)
+          : nodeHttpsRequest(url, method, headers, init.body);
+        void request.then(resolve, reject);
+      });
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function buildHttpsRequestOptions(

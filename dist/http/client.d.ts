@@ -13,6 +13,7 @@ export interface ApiClientOptions extends Credentials {
     fetch?: typeof globalThis.fetch;
     timeoutMs?: number;
     maxResponseBytes?: number;
+    retryDelayMs?: number;
 }
 export declare class ApiClient {
     private readonly options;
@@ -24,6 +25,7 @@ export declare class ApiClient {
     private readonly maxResponseBytes;
     constructor(options: ApiClientOptions);
     request<T = unknown>(method: string, path: string, requestOptions?: RequestOptions): Promise<T>;
+    private sendWithTimeout;
 }
 export declare function buildHttpsRequestOptions(url: URL, method: string, headers: Headers): HttpsRequestOptions;
 export {};
