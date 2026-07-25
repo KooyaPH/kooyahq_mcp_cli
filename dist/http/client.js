@@ -36,7 +36,7 @@ export class ApiClient {
         const headers = new Headers({
             accept: 'application/json',
             authorization: `KooyaKey ${this.options.accessKeyId}:${this.options.secretAccessKey}`,
-            'user-agent': `kooyahq-cli/${this.options.version} (${this.platform}; node/${this.nodeVersion})`,
+            'user-agent': `${this.options.clientName ?? 'kooyahq-cli'}/${this.options.version} (${this.platform}; node/${this.nodeVersion})`,
         });
         const init = { method, headers, redirect: 'error' };
         if (requestOptions.body !== undefined) {

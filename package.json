@@ -11,7 +11,8 @@
   "private": true,
   "type": "module",
   "bin": {
-    "kooyahq": "dist/bin/kooyahq.js"
+    "kooyahq": "dist/bin/kooyahq.js",
+    "kooyahq-mcp": "dist/bin/kooyahq-mcp.js"
   },
   "files": [
     "dist",

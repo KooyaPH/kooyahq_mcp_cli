@@ -27,6 +27,7 @@ npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli
 hash -r
 kooyahq --version
 kooyahq --help
+kooyahq-mcp --version
 ```
 
 ### Windows
@@ -37,6 +38,7 @@ Run in PowerShell with Git for Windows and Node.js installed:
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
+kooyahq-mcp --version
 ```
 
 The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout. To uninstall:
@@ -102,6 +104,83 @@ kooyahq --skill tickets create --output json
 Command help includes the workflow, exact flags, enum values, required and at-least-one groups, mutually exclusive options, conditional parameters, scalar and collection limits, cross-field ordering rules, compatibility aliases, shell-safe examples, response notes, and security behavior. `--skill ... --output json` emits schema version 2: a stable, machine-readable command contract with those constraints, import schemas, and response metadata for automation and AI tools. Configuration discovery is also offline; it never reveals stored credentials.
 
 Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Mongo-backed selectors require a 24-character lowercase hexadecimal ObjectId; keys use the documented `OPS` or `OPS-42` forms. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
+
+## Local stdio MCP server for AI tools
+
+The package also installs `kooyahq-mcp`, a local stdio MCP server for AI clients. It is not a hosted remote service. It runs on the user's machine, uses the same `kooyahq configure` profile or `KOOYAHQ_*` environment variables, and sends requests only through the same authenticated backend routes as the human CLI.
+
+Typical MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "kooyahq": {
+      "command": "kooyahq-mcp"
+    }
+  }
+}
+```
+
+Smoke-test the binary without starting a long-running session:
+
+```sh
+kooyahq-mcp --version
+kooyahq-mcp --help
+```
+
+MCP exposes three stable tools:
+
+- `kooyahq_status`: verifies the configured access key and returns the acting user profile.
+- `kooyahq_discover`: returns the same schema version 2 command contract as `kooyahq --skill ... --output json`, including parameters, enums, workflows, relationships, examples, and safety notes.
+- `kooyahq_call`: executes one exact command using structured arguments keyed by CLI flag name without leading dashes.
+
+Example discovery request:
+
+```json
+{
+  "scope": "tickets create"
+}
+```
+
+Example read request:
+
+```json
+{
+  "command": "tickets list",
+  "args": {
+    "board-key": "OPS",
+    "search": "release",
+    "sort": "createdAt",
+    "order": "desc",
+    "limit": 20
+  }
+}
+```
+
+Example mutation dry-run:
+
+```json
+{
+  "command": "tickets create",
+  "confirm": true,
+  "dryRun": true,
+  "args": {
+    "board-key": "OPS",
+    "ticket-type": "task",
+    "title": "Release"
+  }
+}
+```
+
+MCP safety behavior:
+
+- Every non-GET command requires top-level `confirm: true` before the bridge can create a network request.
+- `dryRun: true` validates and returns the request shape without reading credentials or sending network traffic.
+- Unknown commands and unknown argument keys are rejected locally.
+- Import commands do not read local files through MCP. Pass bounded structured JSON using `args.input`; the bridge supplies it to the existing import validator as standard input.
+- `all: true` maps to `--all` and keeps the same 100-page, 100,000-item, and 50 MiB aggregate limits.
+- MCP requests are audited by the backend as `clientType: "mcp"` through the `kooyahq-mcp/<version>` user-agent.
+- Backend permissions remain authoritative. The MCP server cannot widen access beyond the configured key owner.
 
 ## Command catalog
 
@@ -432,4 +511,4 @@ git diff --exit-code -- dist
 npm audit --omit=dev
 ```
 
-CI verifies Node.js 18, 20, 22, and 24 on Linux, checks that committed `dist/` matches the TypeScript source, packs and installs the artifact, and smoke-tests Linux, macOS, and Windows. Each operating-system job also performs a local Git global installation into an isolated prefix and executes the generated command shim. The repository has no npm publication or deployment workflow.
+Required CI verifies Node.js 18, 20, 22, and 24 on Linux, checks that committed `dist/` matches the TypeScript source, packs and installs the artifact, and performs a local Git global installation into an isolated prefix. Hosted Ubuntu, macOS, and Windows smoke jobs are defined in the workflow and run when the repository variable `KOOYAHQ_CLI_ENABLE_HOSTED_SMOKE` is set to `true`; keep them optional when the GitHub organization has no hosted-runner capacity. The repository has no npm publication or deployment workflow.

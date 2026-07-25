@@ -16,6 +16,9 @@ const dependency = `git+file:${repositoryUrl.href.slice('file:'.length)}#${sha}`
 const executable = process.platform === 'win32'
   ? join(prefix, 'kooyahq.cmd')
   : join(prefix, 'bin', 'kooyahq');
+const mcpExecutable = process.platform === 'win32'
+  ? join(prefix, 'kooyahq-mcp.cmd')
+  : join(prefix, 'bin', 'kooyahq-mcp');
 
 try {
   execFileSync(npm, [
@@ -30,6 +33,8 @@ try {
   execFileSync(executable, [
     '--skill', 'tickets', 'create', '--output', 'json',
   ], { stdio: 'ignore' });
+  execFileSync(mcpExecutable, ['--version'], { stdio: 'inherit' });
+  execFileSync(mcpExecutable, ['--help'], { stdio: 'ignore' });
 } finally {
   rmSync(prefix, { recursive: true, force: true });
 }

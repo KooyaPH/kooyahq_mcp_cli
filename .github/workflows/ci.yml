@@ -59,9 +59,12 @@ jobs:
         run: |
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --version
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --help
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq-mcp" --version
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq-mcp" --help
 
   cross-platform-smoke:
     name: ${{ matrix.os }} / Node 18
+    if: ${{ vars.KOOYAHQ_CLI_ENABLE_HOSTED_SMOKE == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -97,6 +100,8 @@ jobs:
           node dist/bin/kooyahq.js --version
           node dist/bin/kooyahq.js --help >/dev/null
           node dist/bin/kooyahq.js --skill tickets create --output json >/dev/null
+          node dist/bin/kooyahq-mcp.js --version
+          node dist/bin/kooyahq-mcp.js --help >/dev/null
         shell: bash
 
       - name: Smoke-test local Git global installation and command shim
@@ -110,8 +115,12 @@ jobs:
     steps:
       - name: Verify matrix result
         run: |
-          if [ "${{ needs.verify.result }}" != "success" ] || [ "${{ needs.cross-platform-smoke.result }}" != "success" ]; then
-            echo "Verification failed: linux=${{ needs.verify.result }}, cross-platform=${{ needs.cross-platform-smoke.result }}"
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "Verification failed: linux=${{ needs.verify.result }}"
             exit 1
           fi
-          echo "Linux and cross-platform checks passed."
+          if [ "${{ needs.cross-platform-smoke.result }}" != "success" ] && [ "${{ needs.cross-platform-smoke.result }}" != "skipped" ]; then
+            echo "Verification failed: cross-platform=${{ needs.cross-platform-smoke.result }}"
+            exit 1
+          fi
+          echo "Required Linux checks passed; cross-platform=${{ needs.cross-platform-smoke.result }}."

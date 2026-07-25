@@ -232,6 +232,7 @@ function createClient(credentials, dependencies) {
     return new ApiClient({
         ...credentials,
         version: dependencies.version,
+        ...(dependencies.clientName ? { clientName: dependencies.clientName } : {}),
         platform: dependencies.platform,
         nodeVersion: process.versions.node,
         ...(dependencies.fetch ? { fetch: dependencies.fetch } : {}),

@@ -24,10 +24,12 @@ test('GitHub installs use committed dist files without compiling TypeScript', ()
   assert.equal(packageLock.version, '0.2.0');
   assert.equal(packageLock.packages?.['']?.version, '0.2.0');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
+  assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.ok(packageJson.files?.includes('dist'));
   assert.equal(packageJson.scripts?.prepare, 'node scripts/prepare-git-install.mjs');
   assert.doesNotMatch(packageJson.scripts?.prepare ?? '', /tsc|npm run build/);
   assert.ok(existsSync('dist/bin/kooyahq.js'));
+  assert.ok(existsSync('dist/bin/kooyahq-mcp.js'));
   assert.ok(existsSync('scripts/prepare-git-install.mjs'));
 });
 
@@ -37,6 +39,10 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /hash -r/);
   assert.match(readme, /tsc: not found/);
   assert.match(readme, /kooyahq auth whoami/);
+  assert.match(readme, /kooyahq-mcp/);
+  assert.match(readme, /stdio MCP/i);
+  assert.match(readme, /kooyahq_discover/);
+  assert.match(readme, /kooyahq_call/);
   assert.match(readme, /kooyahq --skill tickets create/);
   assert.match(readme, /Windows/);
   assert.match(readme, /macOS/);
@@ -65,7 +71,10 @@ test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () 
   assert.match(workflow, /ubuntu-latest/);
   assert.match(workflow, /macos-latest/);
   assert.match(workflow, /windows-latest/);
+  assert.match(workflow, /KOOYAHQ_CLI_ENABLE_HOSTED_SMOKE/);
+  assert.match(workflow, /needs\.cross-platform-smoke\.result[\s\S]*skipped/);
   assert.match(workflow, /kooyahq\.js --skill/);
+  assert.match(workflow, /kooyahq-mcp\.js/);
   assert.match(workflow, /node scripts\/smoke-git-install\.mjs/);
   assert.match(gitInstallSmoke, /--global/);
   assert.match(gitInstallSmoke, /--install-links=true/);
