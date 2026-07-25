@@ -4,6 +4,8 @@ import { validateBaseUrl } from '../config/url.js';
 export const API_ROOT = '/api/cli/v1';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+const DEFAULT_GET_RETRIES = 9;
+const DEFAULT_RETRY_DELAY_MS = 250;
 export class ApiClient {
     options;
     fetchImplementation;
@@ -41,10 +43,38 @@ export class ApiClient {
             headers.set('content-type', 'application/json');
             init.body = JSON.stringify(requestOptions.body);
         }
+        const attempts = method.toUpperCase() === 'GET' ? DEFAULT_GET_RETRIES + 1 : 1;
         let response;
+        try {
+            for (let attempt = 1; attempt <= attempts; attempt += 1) {
+                try {
+                    response = await this.sendWithTimeout(url, method, headers, init);
+                    break;
+                }
+                catch (error) {
+                    if (attempt === attempts)
+                        throw error;
+                    await delay(this.options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
+                }
+            }
+        }
+        catch {
+            throw new NetworkError();
+        }
+        if (!response)
+            throw new NetworkError();
+        const payload = await parseResponse(response, this.maxResponseBytes);
+        if (!response.ok) {
+            throw new ApiError(redactCredentials(errorMessage(payload, response.status), this.options), response.status);
+        }
+        return payload;
+    }
+    async sendWithTimeout(url, method, headers, init) {
+        const controller = new AbortController();
+        init.signal = controller.signal;
         let timeout;
         try {
-            response = await new Promise((resolve, reject) => {
+            return await new Promise((resolve, reject) => {
                 timeout = setTimeout(() => {
                     controller.abort();
                     reject(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
@@ -55,19 +85,14 @@ export class ApiClient {
                 void request.then(resolve, reject);
             });
         }
-        catch {
-            throw new NetworkError();
-        }
         finally {
             if (timeout)
                 clearTimeout(timeout);
         }
-        const payload = await parseResponse(response, this.maxResponseBytes);
-        if (!response.ok) {
-            throw new ApiError(redactCredentials(errorMessage(payload, response.status), this.options), response.status);
-        }
-        return payload;
     }
+}
+async function delay(ms) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
 }
 export function buildHttpsRequestOptions(url, method, headers) {
     return {
