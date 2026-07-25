@@ -99,6 +99,10 @@ const ticketCreateBody = {
   priority: { apiName: 'priority', choices: PRIORITIES }, tags: { apiName: 'tags', type: 'csv' as const },
   'assignee-id': { apiName: 'assigneeId' },
   'acceptance-criteria-json': { apiName: 'acceptanceCriteria', type: 'json-array' as const },
+  'parent-ticket-id': { apiName: 'parentTicketId', maxLength: 200 },
+  'parent-ticket-key': { apiName: 'parentTicketKey', format: 'ticket-key' as const },
+  'root-epic-id': { apiName: 'rootEpicId', maxLength: 200 },
+  'root-epic-key': { apiName: 'rootEpicKey', format: 'ticket-key' as const },
   'start-date': { apiName: 'startDate', format: 'date' as const },
   'end-date': { apiName: 'endDate', format: 'date' as const },
   'due-date': { apiName: 'dueDate', format: 'date' as const },
@@ -107,14 +111,22 @@ const {
   'board-id': _boardId,
   'board-key': _boardKey,
   'ticket-type': _ticketType,
+  'parent-ticket-id': _parentTicketId,
+  'parent-ticket-key': _parentTicketKey,
+  'root-epic-id': _rootEpicId,
+  'root-epic-key': _rootEpicKey,
   ...ticketUpdateBody
 } = ticketCreateBody;
 const ticketUpdateWithClearBody = {
   ...ticketUpdateBody,
-  'clear-description': { apiName: 'description', type: 'switch' as const, constant: null },
+  'clear-description': {
+    apiName: 'description',
+    type: 'switch' as const,
+    constant: { type: 'doc', content: [] },
+  },
   'clear-assignee': { apiName: 'assigneeId', type: 'switch' as const, constant: null },
   'clear-points': { apiName: 'points', type: 'switch' as const, constant: null },
-  'clear-tags': { apiName: 'tags', type: 'switch' as const, constant: null },
+  'clear-tags': { apiName: 'tags', type: 'switch' as const, constant: [] },
   'clear-start-date': { apiName: 'startDate', type: 'switch' as const, constant: null },
   'clear-end-date': { apiName: 'endDate', type: 'switch' as const, constant: null },
   'clear-due-date': { apiName: 'dueDate', type: 'switch' as const, constant: null },
@@ -128,7 +140,7 @@ export const ticketCommands: CommandSpec[] = [
     'ticket-type': { apiName: 'ticketType', choices: TICKET_TYPES },
     'column-id': { apiName: 'columnId' }, 'assignee-id': { apiName: 'assigneeId' },
     priority: { apiName: 'priority', choices: PRIORITIES }, archived: { apiName: 'archived', type: 'boolean' },
-  }), exactlyOne: [['board-id', 'board-key']] },
+  }, ['createdAt']), exactlyOne: [['board-id', 'board-key']] },
   { name: 'tickets get', method: 'GET', ...legacyTicketScope() },
   {
     name: 'tickets create',
@@ -138,6 +150,10 @@ export const ticketCommands: CommandSpec[] = [
     requireBody: true,
     requiredOptions: ['ticket-type', 'title'],
     exactlyOne: [['board-id', 'board-key']],
+    atMostOne: [
+      ['parent-ticket-id', 'parent-ticket-key'],
+      ['root-epic-id', 'root-epic-key'],
+    ],
   },
   {
     name: 'tickets update',
@@ -158,7 +174,7 @@ export const ticketCommands: CommandSpec[] = [
   { name: 'tickets delete', method: 'DELETE', ...legacyTicketScope(), confirmation: 'Delete ticket?' },
   { name: 'tickets comments list', method: 'GET', ...legacyTicketScope('/comments', 'ticketId'), query: listQuery({
     'author-id': { apiName: 'authorId' },
-  }) },
+  }, ['createdAt']) },
   {
     name: 'tickets comments create',
     method: 'POST',
@@ -198,15 +214,17 @@ export const ticketCommands: CommandSpec[] = [
     'board-id': { apiName: 'boardId' },
     'board-key': { apiName: 'boardKey', format: 'board-key' },
     archived: { apiName: 'archived', type: 'boolean' },
-  }), requiredOptions: ['query'] },
+  }, ['createdAt']), requiredOptions: ['query'],
+  atMostOne: [['board-id', 'board-key']] },
   { name: 'tickets assigned', method: 'GET', path: '/tickets/assigned', query: listQuery({
     'board-id': { apiName: 'boardId' },
-    'board-key': { apiName: 'boardKey' },
+    'board-key': { apiName: 'boardKey', format: 'board-key' },
     archived: { apiName: 'archived', type: 'boolean' },
-  }) },
+  }, ['createdAt']),
+  atMostOne: [['board-id', 'board-key']] },
   { name: 'tickets detail', method: 'GET', ...ticketScope('/detail') },
-  { name: 'tickets activities list', method: 'GET', ...ticketScope('/activities'), query: listQuery() },
-  { name: 'tickets viewers list', method: 'GET', ...ticketScope('/viewers'), query: listQuery() },
+  { name: 'tickets activities list', method: 'GET', ...ticketScope('/activities'), query: listQuery({}, ['occurredAt', 'createdAt']) },
+  { name: 'tickets viewers list', method: 'GET', ...ticketScope('/viewers'), query: listQuery({}, ['name', 'email']) },
   { name: 'tickets archive', method: 'POST', ...ticketScope('/archive') },
   { name: 'tickets unarchive', method: 'POST', ...ticketScope('/unarchive') },
   {
@@ -216,14 +234,19 @@ export const ticketCommands: CommandSpec[] = [
     body: {
       'column-id': { apiName: 'columnId' },
       'before-ticket-id': { apiName: 'beforeTicketId' },
+      'before-ticket-key': { apiName: 'beforeTicketKey', format: 'ticket-key' },
       'after-ticket-id': { apiName: 'afterTicketId' },
+      'after-ticket-key': { apiName: 'afterTicketKey', format: 'ticket-key' },
       first: { apiName: 'position', type: 'switch', constant: 'first' },
       last: { apiName: 'position', type: 'switch', constant: 'last' },
     },
     requiredOptions: ['column-id'],
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
-      ['before-ticket-id', 'after-ticket-id', 'first', 'last'],
+      [
+        'before-ticket-id', 'before-ticket-key', 'after-ticket-id', 'after-ticket-key',
+        'first', 'last',
+      ],
     ],
   },
   {
@@ -231,8 +254,7 @@ export const ticketCommands: CommandSpec[] = [
     method: 'POST',
     ...ticketScope('/improve'),
     body: {
-      instructions: { apiName: 'instructions' },
-      'apply-fields': { apiName: 'applyFields', type: 'csv' },
+      'user-command': { apiName: 'userCommand', maxLength: 5000 },
     },
   },
   {
@@ -241,9 +263,9 @@ export const ticketCommands: CommandSpec[] = [
     path: '/tickets/improve-draft',
     body: {
       'board-id': { apiName: 'boardId' },
-      'board-key': { apiName: 'boardKey' },
+      'board-key': { apiName: 'boardKey', format: 'board-key' },
       'draft-json': { apiName: 'draft', type: 'json-object' },
-      instructions: { apiName: 'instructions' },
+      'user-command': { apiName: 'userCommand', maxLength: 5000 },
     },
     requiredOptions: ['draft-json'],
     exactlyOne: [['board-id', 'board-key']],
@@ -254,7 +276,7 @@ export const ticketCommands: CommandSpec[] = [
     ...ticketScope('/parent'),
     body: {
       'parent-ticket-id': { apiName: 'parentTicketId' },
-      'parent-ticket-key': { apiName: 'parentTicketKey' },
+      'parent-ticket-key': { apiName: 'parentTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -268,7 +290,7 @@ export const ticketCommands: CommandSpec[] = [
     ...ticketScope('/epic'),
     body: {
       'epic-ticket-id': { apiName: 'epicTicketId' },
-      'epic-ticket-key': { apiName: 'epicTicketKey' },
+      'epic-ticket-key': { apiName: 'epicTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -276,7 +298,7 @@ export const ticketCommands: CommandSpec[] = [
     ],
   },
   { name: 'tickets epic clear', method: 'DELETE', ...ticketScope('/epic') },
-  { name: 'tickets subtasks list', method: 'GET', ...ticketScope('/subtasks'), query: listQuery() },
+  { name: 'tickets subtasks list', method: 'GET', ...ticketScope('/subtasks'), query: listQuery({}, ['createdAt']) },
   { name: 'tickets criteria list', method: 'GET', ...ticketScope('/acceptance-criteria') },
   {
     name: 'tickets criteria add',
@@ -309,14 +331,16 @@ export const ticketCommands: CommandSpec[] = [
     body: {
       type: { apiName: 'type', choices: DOCUMENT_TYPES },
       url: { apiName: 'url', format: 'https-url', maxLength: 2048 },
-      title: { apiName: 'title' },
+      name: { apiName: 'name', maxLength: 500 },
     },
-    requiredOptions: ['type', 'url'],
+    requiredOptions: ['type', 'url', 'name'],
   },
   {
     name: 'tickets documents remove',
     method: 'DELETE',
-    ...ticketChildScope('/documents/:documentId', 'document-id', 'documentId'),
+    ...ticketScope('/documents'),
+    body: { url: { apiName: 'url', format: 'https-url', maxLength: 2048 } },
+    requiredOptions: ['url'],
     confirmation: 'Remove document reference?',
   },
   { name: 'tickets relations list', method: 'GET', ...ticketScope('/related-tickets') },
@@ -326,7 +350,7 @@ export const ticketCommands: CommandSpec[] = [
     ...ticketScope('/related-tickets'),
     body: {
       'related-ticket-id': { apiName: 'relatedTicketId' },
-      'related-ticket-key': { apiName: 'relatedTicketKey' },
+      'related-ticket-key': { apiName: 'relatedTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -339,7 +363,7 @@ export const ticketCommands: CommandSpec[] = [
     ...ticketScope('/related-tickets'),
     body: {
       'related-ticket-id': { apiName: 'relatedTicketId' },
-      'related-ticket-key': { apiName: 'relatedTicketKey' },
+      'related-ticket-key': { apiName: 'relatedTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -347,14 +371,23 @@ export const ticketCommands: CommandSpec[] = [
     ],
     confirmation: 'Remove related ticket?',
   },
-  { name: 'tickets blockers list', method: 'GET', ...ticketScope('/blockers') },
+  {
+    name: 'tickets blockers list',
+    method: 'GET',
+    ...ticketScope('/blockers'),
+    query: { direction: { apiName: 'direction', choices: ['blocked-by', 'blocking', 'all'] } },
+    response: {
+      description: 'Returns a relationship envelope with blockedBy and blocking ticket arrays.',
+      fields: ['blockedBy', 'blocking'],
+    },
+  },
   {
     name: 'tickets blockers add',
     method: 'POST',
     ...ticketScope('/blockers'),
     body: {
       'blocker-ticket-id': { apiName: 'blockerTicketId' },
-      'blocker-ticket-key': { apiName: 'blockerTicketKey' },
+      'blocker-ticket-key': { apiName: 'blockerTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -367,7 +400,7 @@ export const ticketCommands: CommandSpec[] = [
     ...ticketScope('/blockers'),
     body: {
       'blocker-ticket-id': { apiName: 'blockerTicketId' },
-      'blocker-ticket-key': { apiName: 'blockerTicketKey' },
+      'blocker-ticket-key': { apiName: 'blockerTicketKey', format: 'ticket-key' },
     },
     exactlyOne: [
       ['ticket-id', 'ticket-key'],
@@ -400,10 +433,10 @@ export const ticketCommands: CommandSpec[] = [
     path: '/tickets/import/preview',
     body: {
       'board-id': { apiName: 'boardId' },
-      'board-key': { apiName: 'boardKey' },
+      'board-key': { apiName: 'boardKey', format: 'board-key' },
     },
     exactlyOne: [['board-id', 'board-key']],
-    fileInput: { bodyName: 'tickets', maxBytes: 5 * 1024 * 1024, maxItems: 250 },
+    fileInput: { bodyName: 'rows', maxBytes: 5 * 1024 * 1024, maxItems: 250 },
   },
   {
     name: 'tickets import apply',
@@ -411,10 +444,10 @@ export const ticketCommands: CommandSpec[] = [
     path: '/tickets/import',
     body: {
       'board-id': { apiName: 'boardId' },
-      'board-key': { apiName: 'boardKey' },
+      'board-key': { apiName: 'boardKey', format: 'board-key' },
     },
     exactlyOne: [['board-id', 'board-key']],
-    fileInput: { bodyName: 'tickets', maxBytes: 5 * 1024 * 1024, maxItems: 250 },
+    fileInput: { bodyName: 'rows', maxBytes: 5 * 1024 * 1024, maxItems: 250 },
     confirmation: 'Import tickets?',
   },
 ];

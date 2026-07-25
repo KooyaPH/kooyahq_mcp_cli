@@ -12,7 +12,7 @@ export function formatOutput(value: unknown, format: OutputFormat): string {
   const records = rows.map(toRecord);
   const columns = [...new Set(records.flatMap((row) => Object.keys(row)))];
   const widths = columns.map((column) => Math.max(
-    column.length,
+    display(column).length,
     ...records.map((row) => display(row[column]).length),
   ));
   const line = (row: Record<string, unknown>) => columns
@@ -42,6 +42,10 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function display(value: unknown): string {
   if (value === undefined || value === null) return '';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
+  if (typeof value === 'object') return sanitizeTableText(JSON.stringify(value));
+  return sanitizeTableText(String(value));
+}
+
+function sanitizeTableText(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ');
 }

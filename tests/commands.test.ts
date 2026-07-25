@@ -197,6 +197,24 @@ test('allowlists and URL-encodes list filters, sort, and pagination', () => {
   );
 });
 
+test('preserves every equals sign in an inline option value', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'search', '--query=alpha=beta=gamma', '--board-id=board-1',
+  ]).query, {
+    q: 'alpha=beta=gamma',
+    boardId: 'board-1',
+  });
+});
+
+test('rejects repeated non-repeatable options', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'boards', 'delete', '--board-id=first', '--board-id=second', '--yes',
+    ]),
+    /Option --board-id must not be repeated/,
+  );
+});
+
 test('maps backend-specific whoami, timer, ticket, comment, and analytics contracts', () => {
   assert.equal(buildRequest(commandCatalog, ['auth', 'whoami']).path, '/whoami');
   assert.deepEqual(buildRequest(commandCatalog, [
@@ -340,12 +358,14 @@ test('enforces and maps ticket JSON, array, and required fields', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'create', '--board-id', 'board-1', '--ticket-type', 'task', '--title', 'Ship',
     '--description-json', '{"type":"doc"}', '--acceptance-criteria-json', '[{"text":"Verified"}]',
-    '--tags', 'release, urgent', '--points', '3',
+    '--tags', 'release, urgent', '--points', '3', '--parent-ticket-key', 'OPS-7',
+    '--root-epic-id', 'ticket-epic-1',
   ]), {
     method: 'POST', path: '/tickets', query: {},
     body: {
       boardId: 'board-1', ticketType: 'task', title: 'Ship', description: { type: 'doc' },
       acceptanceCriteria: [{ text: 'Verified' }], tags: ['release', 'urgent'], points: 3,
+      parentTicketKey: 'OPS-7', rootEpicId: 'ticket-epic-1',
     },
     output: 'table',
   });
@@ -377,8 +397,13 @@ test('enforces and maps ticket JSON, array, and required fields', () => {
 test('uses explicit clear flags and rejects conflicting set-and-clear options', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'update', '--ticket-id', 'ticket-1',
-    '--clear-assignee', '--clear-due-date',
-  ]).body, { assigneeId: null, dueDate: null });
+    '--clear-assignee', '--clear-due-date', '--clear-description', '--clear-tags',
+  ]).body, {
+    assigneeId: null,
+    dueDate: null,
+    description: { type: 'doc', content: [] },
+    tags: [],
+  });
   assert.throws(
     () => buildRequest(commandCatalog, [
       'tickets', 'update', '--ticket-id', 'ticket-1',
@@ -402,12 +427,12 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
   });
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'move', '--ticket-id', 'ticket-1', '--column-id', 'column-2',
-    '--after-ticket-id', 'ticket-9',
+    '--after-ticket-key', 'OPS-9',
   ]), {
     method: 'PATCH',
     path: '/tickets/ticket-1/move',
     query: {},
-    body: { columnId: 'column-2', afterTicketId: 'ticket-9' },
+    body: { columnId: 'column-2', afterTicketKey: 'OPS-9' },
     output: 'table',
   });
   assert.deepEqual(buildRequest(commandCatalog, [
@@ -419,8 +444,18 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
   ]).body, { completed: true });
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'documents', 'add', '--ticket-id', 'ticket-1', '--type', 'figma',
-    '--url', 'https://www.figma.com/design/abc', '--title', 'Design',
-  ]).body, { type: 'figma', url: 'https://www.figma.com/design/abc', title: 'Design' });
+    '--url', 'https://www.figma.com/design/abc', '--name', 'Design',
+  ]).body, { type: 'figma', url: 'https://www.figma.com/design/abc', name: 'Design' });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'documents', 'remove', '--ticket-key', 'OPS-42',
+    '--url', 'https://www.figma.com/design/abc', '--yes',
+  ]), {
+    method: 'DELETE',
+    path: '/tickets/key/OPS-42/documents',
+    query: {},
+    body: { url: 'https://www.figma.com/design/abc' },
+    output: 'table',
+  });
   assert.deepEqual(buildRequest(commandCatalog, [
     'tickets', 'blockers', 'add', '--ticket-id', 'ticket-1', '--blocker-ticket-key', 'OPS-2',
   ]).body, { blockerTicketKey: 'OPS-2' });
@@ -440,13 +475,59 @@ test('maps ticket lifecycle, hierarchy, link, and development workflow commands'
     ]),
     /exactly one of --related-ticket-id or --related-ticket-key/,
   );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'improve', '--ticket-key', 'OPS-42', '--user-command', 'Focus on rollback safety',
+  ]).body, { userCommand: 'Focus on rollback safety' });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['tickets', 'improve', '--ticket-id', 'ticket-1', '--instructions', 'rewrite']),
+    /Unknown option --instructions/,
+  );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'tickets', 'blockers', 'list', '--ticket-key', 'OPS-42', '--direction', 'blocked-by',
+  ]).query, { direction: 'blocked-by' });
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'blockers', 'list', '--ticket-key', 'OPS-42', '--direction', 'incoming',
+    ]),
+    /blocked-by, blocking, all/,
+  );
+});
+
+test('requires unambiguous hierarchy, move anchor, and document selectors', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'create', '--board-id', 'board-1', '--ticket-type', 'subtask', '--title', 'Child',
+      '--parent-ticket-id', 'ticket-1', '--parent-ticket-key', 'OPS-1',
+    ]),
+    /at most one of --parent-ticket-id or --parent-ticket-key/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'move', '--ticket-id', 'ticket-1', '--column-id', 'column-2',
+      '--before-ticket-id', 'ticket-2', '--before-ticket-key', 'OPS-2',
+    ]),
+    /exactly one of/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'documents', 'add', '--ticket-id', 'ticket-1',
+      '--type', 'doc', '--url', 'https://example.com/spec',
+    ]),
+    /requires --name/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'documents', 'remove', '--ticket-id', 'ticket-1', '--document-id', 'invented',
+    ]),
+    /Unknown option --document-id/,
+  );
 });
 
 test('rejects unsafe URLs, invalid ranges, and oversized timer batches locally', () => {
   assert.throws(
     () => buildRequest(commandCatalog, [
       'tickets', 'documents', 'add', '--ticket-id', 'ticket-1',
-      '--type', 'other', '--url', 'http://example.com/reference',
+      '--type', 'other', '--url', 'http://example.com/reference', '--name', 'Reference',
     ]),
     /HTTPS URL/,
   );
@@ -695,5 +776,125 @@ test('requires confirmation for destructive bulk or delete operations', () => {
   assert.equal(
     buildRequest(commandCatalog, ['time', 'timers', 'stop-all', '--yes']).confirmation,
     undefined,
+  );
+});
+
+test('applies endpoint-specific sort allowlists and selector validation', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, ['boards', 'list', '--sort', 'duration']),
+    /--sort must be/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['boards', 'members', 'list', '--board-key', 'OPS', '--role', 'owner']),
+    /--role must be admin, member, viewer/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'assigned', '--board-id', 'board-1', '--board-key', 'OPS',
+    ]),
+    /at most one of --board-id or --board-key/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['tickets', 'assigned', '--board-key', 'OPS!']),
+    /alphanumeric board key/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'tickets', 'search', '--query', 'release', '--board-id', 'board-1', '--board-key', 'OPS',
+    ]),
+    /at most one of --board-id or --board-key/,
+  );
+});
+
+test('validates calendar dates, strict timestamps, and every declared range locally', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'time', 'entries', 'list', '--start-date', '2026-02-30', '--end-date', '2026-03-01',
+    ]),
+    /valid YYYY-MM-DD date/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['time', 'entries', 'list', '--start-date', '2026-07-01']),
+    /requires --end-date/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'time', 'entries', 'list', '--start-date', '2026-07-25', '--end-date', '2026-07-01',
+    ]),
+    /must not be after/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'time', 'entries', 'create', '--projects', 'Kooya', '--task', 'Review', '--duration', '30',
+      '--start-time', '2026-02-30T09:00:00Z', '--end-time', '2026-07-25T10:00:00Z',
+    ]),
+    /zoned ISO-8601 timestamp/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'time', 'entries', 'create', '--projects', 'Kooya', '--task', 'Review', '--duration', '30',
+      '--start-time', '2026-07-25T10:00:00Z', '--end-time', '2026-07-25T09:00:00Z',
+    ]),
+    /--start-time must not be after --end-time/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'analytics', 'costs', 'compare',
+      '--current-start', '2026-08-01', '--current-end', '2026-07-01',
+      '--previous-start', '2026-06-01', '--previous-end', '2026-06-30',
+    ]),
+    /--current-start must not be after --current-end/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'analytics', 'costs', 'compare',
+      '--current-start', '2025-01-01', '--current-end', '2026-07-25',
+      '--previous-start', '2024-01-01', '--previous-end', '2024-01-31',
+    ]),
+    /Date range must not exceed 366 days/,
+  );
+});
+
+test('validates endpoint URLs and board keys before sending requests', () => {
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'projects', 'create', '--name', 'Kooya', '--icon-url', 'javascript:alert(1)',
+    ]),
+    /HTTPS URL/,
+  );
+  for (const command of [
+    ['tickets', 'improve-draft', '--board-key', 'OPS!', '--draft-json', '{}'],
+    ['tickets', 'import', 'preview', '--board-key', 'OPS!', '--stdin'],
+  ]) {
+    assert.throws(() => buildRequest(commandCatalog, command), /alphanumeric board key/);
+  }
+});
+
+test('maps user WhatsApp and explicit permission clearing without ambiguous empty values', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'users', 'create', '--name', 'Sam', '--email', 'sam@example.com',
+    '--whatsapp-phone', '+639171234567',
+  ]).body, {
+    name: 'Sam', email: 'sam@example.com', whatsappPhone: '+639171234567',
+  });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'users', 'update', '--user-id', 'user-1', '--clear-whatsapp-phone', '--clear-permissions',
+  ]).body, { whatsappPhone: null, permissions: [] });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'users', 'permissions', 'update', '--user-id', 'user-1', '--clear-permissions',
+  ]).body, { permissions: [] });
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'users', 'update', '--user-id', 'user-1', '--whatsapp-phone', '+639171234567',
+      '--clear-whatsapp-phone',
+    ]),
+    /at most one of --whatsapp-phone or --clear-whatsapp-phone/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, [
+      'users', 'permissions', 'update', '--user-id', 'user-1',
+      '--permissions', 'boards.read', '--clear-permissions',
+    ]),
+    /at most one of --permissions or --clear-permissions/,
   );
 });

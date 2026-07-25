@@ -1,11 +1,12 @@
 import { legacyIdSelector, listQuery } from '../shared.js';
 const body = {
-    name: { apiName: 'name' }, emoji: { apiName: 'emoji' }, 'icon-url': { apiName: 'iconUrl' },
+    name: { apiName: 'name' }, emoji: { apiName: 'emoji' },
+    'icon-url': { apiName: 'iconUrl', format: 'https-url' },
 };
 export const projectCommands = [
     { name: 'projects list', method: 'GET', path: '/projects', query: listQuery({
             search: { apiName: 'search' },
-        }) },
+        }, ['name', 'createdAt']) },
     { name: 'projects get', method: 'GET', ...legacyIdSelector('project-id', 'projectId', '/projects/:projectId') },
     { name: 'projects create', method: 'POST', path: '/projects', body, requireBody: true, requiredOptions: ['name'] },
     { name: 'projects update', method: 'PATCH', ...legacyIdSelector('project-id', 'projectId', '/projects/:projectId'), body, requireBody: true },

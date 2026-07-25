@@ -13,7 +13,7 @@ export function formatOutput(value, format) {
         return 'No results.';
     const records = rows.map(toRecord);
     const columns = [...new Set(records.flatMap((row) => Object.keys(row)))];
-    const widths = columns.map((column) => Math.max(column.length, ...records.map((row) => display(row[column]).length)));
+    const widths = columns.map((column) => Math.max(display(column).length, ...records.map((row) => display(row[column]).length)));
     const line = (row) => columns
         .map((column, index) => display(row[column]).padEnd(widths[index]))
         .join('  ')
@@ -43,7 +43,10 @@ function display(value) {
     if (value === undefined || value === null)
         return '';
     if (typeof value === 'object')
-        return JSON.stringify(value);
-    return String(value);
+        return sanitizeTableText(JSON.stringify(value));
+    return sanitizeTableText(String(value));
+}
+function sanitizeTableText(value) {
+    return value.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ');
 }
 //# sourceMappingURL=format.js.map

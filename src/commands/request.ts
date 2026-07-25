@@ -92,7 +92,8 @@ export function buildRequest(catalog: CommandSpec[], argv: string[]): CommandReq
       );
     }
   }
-  if (command.dateRange) validateDateRange(parsed.values, command.dateRange);
+  for (const range of normalizeRanges(command.dateRange)) validateDateRange(parsed.values, range);
+  for (const range of normalizeRanges(command.dateTimeRange)) validateDateTimeRange(parsed.values, range);
   const query = mapOptions(parsed.values, command.query ?? {}) as CommandRequest['query'];
   const providedBody = mapOptions(parsed.values, command.body ?? {});
   const positionalBody = Object.fromEntries(
@@ -203,11 +204,19 @@ function parseOptions(
   let output: OutputFormat = 'table';
   let dryRun = false;
   let all = false;
+  const suppliedOptions = new Set<string>();
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index]!;
     if (!token.startsWith('--')) throw new ValidationError(`Unexpected argument ${token}.`);
-    const [rawName, inlineValue] = token.slice(2).split('=', 2);
+    const option = token.slice(2);
+    const equalsIndex = option.indexOf('=');
+    const rawName = equalsIndex === -1 ? option : option.slice(0, equalsIndex);
+    const inlineValue = equalsIndex === -1 ? undefined : option.slice(equalsIndex + 1);
     if (!rawName) throw new ValidationError('Option name must not be blank.');
+    if (suppliedOptions.has(rawName)) {
+      throw new ValidationError(`Option --${rawName} must not be repeated.`);
+    }
+    suppliedOptions.add(rawName);
     if (rawName === 'yes') {
       if (!allowYes) throw new ValidationError('Unknown option --yes.');
       if (inlineValue !== undefined) throw new ValidationError('--yes does not take a value.');
@@ -379,7 +388,8 @@ function validateFormat(
     return;
   }
   if (format === 'datetime') {
-    if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(value) || Number.isNaN(Date.parse(value))) {
+    const match = /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/.exec(value);
+    if (!match || !isCalendarDate(match[1]!) || Number.isNaN(Date.parse(value))) {
       throw new ValidationError(`--${flag} must be a zoned ISO-8601 timestamp.`);
     }
     return;
@@ -430,7 +440,7 @@ function isCalendarDate(value: string): boolean {
 
 function validateDateRange(
   values: Record<string, string>,
-  range: NonNullable<CommandSpec['dateRange']>,
+  range: Exclude<NonNullable<CommandSpec['dateRange']>, unknown[]>,
 ): void {
   const start = values[range.startOption];
   const end = values[range.endOption];
@@ -442,6 +452,26 @@ function validateDateRange(
   if (days > range.maxDays) {
     throw new ValidationError(`Date range must not exceed ${range.maxDays} days.`);
   }
+}
+
+function validateDateTimeRange(
+  values: Record<string, string>,
+  range: Exclude<NonNullable<CommandSpec['dateTimeRange']>, unknown[]>,
+): void {
+  const start = values[range.startOption];
+  const end = values[range.endOption];
+  if (!start || !end) return;
+  const startValue = Date.parse(start);
+  const endValue = Date.parse(end);
+  if (Number.isNaN(startValue) || Number.isNaN(endValue)) return;
+  if (startValue > endValue) {
+    throw new ValidationError(`--${range.startOption} must not be after --${range.endOption}.`);
+  }
+}
+
+function normalizeRanges<T>(range: T | T[] | undefined): T[] {
+  if (!range) return [];
+  return Array.isArray(range) ? range : [range];
 }
 
 function interpolate(template: string, values: Record<string, string | undefined>): string {

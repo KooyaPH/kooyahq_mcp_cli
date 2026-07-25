@@ -10,6 +10,9 @@ const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
 
 const readme = readFileSync('README.md', 'utf8');
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
+  ? readFileSync('scripts/smoke-git-install.mjs', 'utf8')
+  : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
@@ -29,6 +32,13 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /kooyahq --skill tickets create/);
   assert.match(readme, /Windows/);
   assert.match(readme, /macOS/);
+  assert.match(readme, /100,000 items/);
+  assert.match(readme, /50 MiB/);
+  assert.match(readme, /--clear-whatsapp-phone/);
+  assert.match(readme, /--clear-permissions/);
+  assert.match(readme, /acceptanceCriteriaJson/);
+  assert.match(readme, /--direction blocked-by\|blocking\|all/);
+  assert.match(readme, /--user-command/);
   assert.doesNotMatch(readme, /global_prefix|globalPrefix|packagePath|binPath/);
 });
 
@@ -38,4 +48,8 @@ test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () 
   assert.match(workflow, /macos-latest/);
   assert.match(workflow, /windows-latest/);
   assert.match(workflow, /kooyahq\.js --skill/);
+  assert.match(workflow, /node scripts\/smoke-git-install\.mjs/);
+  assert.match(gitInstallSmoke, /--global/);
+  assert.match(gitInstallSmoke, /--install-links=true/);
+  assert.match(gitInstallSmoke, /git\+file:/);
 });

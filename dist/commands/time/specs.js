@@ -2,7 +2,8 @@ import { legacyIdSelector, legacyOptionalIdSelector, listQuery } from '../shared
 const entryBody = {
     projects: { apiName: 'projects', type: 'csv' }, task: { apiName: 'task' },
     duration: { apiName: 'duration', type: 'integer' },
-    'start-time': { apiName: 'startTime' }, 'end-time': { apiName: 'endTime' },
+    'start-time': { apiName: 'startTime', format: 'datetime' },
+    'end-time': { apiName: 'endTime', format: 'datetime' },
     'is-overtime': { apiName: 'isOvertime', type: 'boolean' },
 };
 const entryUpdateBody = {
@@ -13,7 +14,7 @@ const entryUpdateBody = {
 export const timeCommands = [
     { name: 'time timers list', method: 'GET', path: '/time/timers', query: listQuery({
             status: { apiName: 'status', choices: ['running', 'paused'] },
-        }) },
+        }, ['createdAt', 'startTime']) },
     { name: 'time timers start', method: 'POST', path: '/time/timers', body: {
             project: { apiName: 'projects', type: 'singleton' }, task: { apiName: 'task' },
             'is-overtime': { apiName: 'isOvertime', type: 'boolean' },
@@ -45,14 +46,20 @@ export const timeCommands = [
     { name: 'time entries list', method: 'GET', path: '/time/entries', query: listQuery({
             project: { apiName: 'project' }, active: { apiName: 'active', type: 'boolean' },
             paused: { apiName: 'paused', type: 'boolean' },
-            'start-date': { apiName: 'startDate' }, 'end-date': { apiName: 'endDate' },
+            'start-date': { apiName: 'startDate', format: 'date' },
+            'end-date': { apiName: 'endDate', format: 'date' },
             scope: { apiName: 'scope', choices: ['me', 'team'] },
             'user-id': { apiName: 'userId' },
-        }), conditionalRequirements: [
+        }, ['createdAt', 'startTime', 'duration']), conditionalRequirements: [
             { option: 'user-id', requires: 'scope', value: 'team' },
-        ] },
+        ], pairedOptions: [['start-date', 'end-date']],
+        dateRange: { startOption: 'start-date', endOption: 'end-date', maxDays: 366 } },
     { name: 'time entries get', method: 'GET', ...legacyIdSelector('entry-id', 'entryId', '/time/entries/:entryId') },
-    { name: 'time entries create', method: 'POST', path: '/time/entries', body: entryBody, requireBody: true, requiredOptions: ['projects', 'task', 'duration'] },
+    {
+        name: 'time entries create', method: 'POST', path: '/time/entries', body: entryBody,
+        requireBody: true, requiredOptions: ['projects', 'task', 'duration'],
+        dateTimeRange: { startOption: 'start-time', endOption: 'end-time' },
+    },
     { name: 'time entries update', method: 'PATCH', ...legacyIdSelector('entry-id', 'entryId', '/time/entries/:entryId'), body: entryUpdateBody, requireBody: true },
     { name: 'time entries delete', method: 'DELETE', ...legacyIdSelector('entry-id', 'entryId', '/time/entries/:entryId'), confirmation: 'Delete time entry {entry-id}?' },
     {
@@ -82,7 +89,7 @@ export const timeCommands = [
             scope: { apiName: 'scope', choices: ['me', 'team'] },
             'user-id': { apiName: 'userId' },
             project: { apiName: 'project' },
-        }),
+        }, ['createdAt', 'startTime', 'duration']),
         conditionalRequirements: [
             { option: 'user-id', requires: 'scope', value: 'team' },
         ],

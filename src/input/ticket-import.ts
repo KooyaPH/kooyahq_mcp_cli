@@ -2,12 +2,37 @@ import { ValidationError } from '../core/errors.js';
 
 export type TicketImportFormat = 'json' | 'csv';
 
-const CSV_HEADERS = new Set([
+export const TICKET_IMPORT_CSV_HEADERS = [
   'importRef', 'title', 'ticketType', 'status', 'priority', 'reporterEmail', 'assigneeEmail',
   'points', 'tags', 'parentRef', 'rootEpicRef', 'startDate', 'endDate', 'dueDate',
   'description', 'acceptanceCriteriaJson', 'documentsJson', 'commentsJson', 'relatedRefs',
   'githubBranchName', 'githubTargetBranch', 'githubPullRequestUrl', 'githubStatus',
-]);
+] as const;
+
+export const TICKET_IMPORT_ROW_FIELDS = [
+  { name: 'importRef', type: 'string' },
+  { name: 'title', type: 'string' },
+  { name: 'ticketType', type: 'string' },
+  { name: 'status', type: 'string' },
+  { name: 'priority', type: 'string' },
+  { name: 'reporterEmail', type: 'string' },
+  { name: 'assigneeEmail', type: 'string' },
+  { name: 'points', type: 'number' },
+  { name: 'tags', type: 'string[] | comma-separated string' },
+  { name: 'parentRef', type: 'string' },
+  { name: 'rootEpicRef', type: 'string' },
+  { name: 'startDate', type: 'YYYY-MM-DD string' },
+  { name: 'endDate', type: 'YYYY-MM-DD string' },
+  { name: 'dueDate', type: 'YYYY-MM-DD string' },
+  { name: 'description', type: 'string' },
+  { name: 'acceptanceCriteria', type: 'array' },
+  { name: 'documents', type: 'array' },
+  { name: 'comments', type: 'array' },
+  { name: 'relatedRefs', type: 'string[] | comma-separated string' },
+  { name: 'github', type: 'object' },
+] as const;
+
+const CSV_HEADERS = new Set<string>(TICKET_IMPORT_CSV_HEADERS);
 
 export function parseTicketImport(
   bytes: Uint8Array,

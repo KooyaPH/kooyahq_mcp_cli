@@ -21,15 +21,28 @@ export interface RuntimeDependencies {
   homeDirectory: string;
   platform: NodeJS.Platform;
   version: string;
-  fetch: typeof globalThis.fetch;
+  fetch?: typeof globalThis.fetch;
   prompt: (question: string, hidden?: boolean) => Promise<string>;
   readInputFile: (path: string, maxBytes: number) => Promise<Uint8Array>;
   readStandardInput: (maxBytes: number) => Promise<Uint8Array>;
+  allPagesLimits?: AllPagesLimits;
   output: {
     stdout: (value: string) => void;
     stderr: (value: string) => void;
   };
 }
+
+export interface AllPagesLimits {
+  maxPages: number;
+  maxItems: number;
+  maxBytes: number;
+}
+
+const DEFAULT_ALL_PAGES_LIMITS: AllPagesLimits = {
+  maxPages: 1_000,
+  maxItems: 100_000,
+  maxBytes: 50 * 1024 * 1024,
+};
 
 export function defaultDependencies(
   version: string,
@@ -40,7 +53,6 @@ export function defaultDependencies(
     homeDirectory: homedir(),
     platform: process.platform,
     version,
-    fetch: globalThis.fetch,
     prompt,
     readInputFile: readBoundedFile,
     readStandardInput: readBoundedStdin,
@@ -55,7 +67,7 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
   try {
     const helpIndex = argv.findIndex((token) => token === '--help' || token === '-h');
     if (argv.length === 0 || helpIndex !== -1) {
-      const scope = helpIndex === -1 ? [] : argv.slice(0, helpIndex);
+      const scope = helpIndex === -1 ? [] : resolveHelpScope(argv.slice(0, helpIndex));
       dependencies.output.stdout(helpText(scope));
       return 0;
     }
@@ -92,7 +104,7 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
       }
     }
     const result = request.all
-      ? await requestAllPages(client, request)
+      ? await requestAllPages(client, request, dependencies.allPagesLimits ?? DEFAULT_ALL_PAGES_LIMITS)
       : await client.request(request.method, request.path, {
         query: request.query,
         ...(request.body === undefined ? {} : { body: request.body }),
@@ -103,6 +115,20 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
     dependencies.output.stderr(publicErrorMessage(error));
     return error instanceof CliError ? error.exitCode : 1;
   }
+}
+
+function resolveHelpScope(argv: string[]): string[] {
+  const command = commandCatalog
+    .map((candidate) => candidate.name.split(' '))
+    .filter((tokens) => tokens.every((token, index) => argv[index] === token))
+    .sort((left, right) => right.length - left.length)[0];
+  if (command) return command;
+
+  const group = argv[0];
+  if (group && commandCatalog.some((candidate) => candidate.name.startsWith(`${group} `))) {
+    return [group];
+  }
+  return argv;
 }
 
 async function materializeFileInput(
@@ -122,25 +148,37 @@ async function materializeFileInput(
   request.body = { ...request.body, [request.fileInput.bodyName]: tickets };
 }
 
-async function requestAllPages(client: ApiClient, request: CommandRequest): Promise<unknown> {
+async function requestAllPages(
+  client: ApiClient,
+  request: CommandRequest,
+  limits: AllPagesLimits,
+): Promise<unknown> {
   const requestedLimit = request.query.limit;
   const limit = typeof requestedLimit === 'number' ? requestedLimit : 100;
   const combined: unknown[] = [];
+  let combinedBytes = 0;
   let firstResponse: unknown;
 
-  for (let page = 1; page <= 1000; page += 1) {
+  for (let page = 1; page <= limits.maxPages; page += 1) {
     const response = await client.request(request.method, request.path, {
       query: { ...request.query, page, limit },
     });
     if (page === 1) firstResponse = response;
     const items = extractList(response);
-    combined.push(...items);
+    if (combined.length + items.length > limits.maxItems) {
+      throw new ValidationError(`Pagination exceeded the ${limits.maxItems}-item safety limit.`);
+    }
+    combinedBytes += Buffer.byteLength(JSON.stringify(items));
+    if (combinedBytes > limits.maxBytes) {
+      throw new ValidationError(`Pagination exceeded the ${limits.maxBytes}-byte safety limit.`);
+    }
+    for (const item of items) combined.push(item);
     const totalPages = extractTotalPages(response);
     if (totalPages !== undefined ? page >= totalPages : items.length < limit) {
       return combinePages(firstResponse, combined);
     }
   }
-  throw new ValidationError('Pagination exceeded the 1000-page safety limit.');
+  throw new ValidationError(`Pagination exceeded the ${limits.maxPages}-page safety limit.`);
 }
 
 function extractTotalPages(value: unknown): number | undefined {
@@ -151,7 +189,8 @@ function extractTotalPages(value: unknown): number | undefined {
       ? (record.meta as Record<string, unknown>).pagination
       : undefined);
   if (!pagination || typeof pagination !== 'object') return undefined;
-  const totalPages = (pagination as Record<string, unknown>).totalPages;
+  const paginationRecord = pagination as Record<string, unknown>;
+  const totalPages = paginationRecord.totalPages ?? paginationRecord.pages;
   return typeof totalPages === 'number' && Number.isSafeInteger(totalPages) && totalPages > 0
     ? totalPages
     : undefined;
@@ -167,7 +206,14 @@ function combinePages(firstResponse: unknown, data: unknown[]): unknown {
   return {
     ...record,
     data,
-    pagination: { ...pagination, page: 1, total: data.length, totalPages: 1, all: true },
+    pagination: {
+      ...pagination,
+      page: 1,
+      total: data.length,
+      pages: 1,
+      totalPages: 1,
+      all: true,
+    },
   };
 }
 
@@ -227,7 +273,7 @@ function createClient(credentials: Credentials, dependencies: RuntimeDependencie
     version: dependencies.version,
     platform: dependencies.platform,
     nodeVersion: process.versions.node,
-    fetch: dependencies.fetch,
+    ...(dependencies.fetch ? { fetch: dependencies.fetch } : {}),
   });
 }
 

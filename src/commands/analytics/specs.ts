@@ -36,7 +36,7 @@ export const analyticsCommands: CommandSpec[] = [
     name: 'analytics costs projects list',
     method: 'GET',
     path: '/analytics/costs/projects',
-    query: listQuery(),
+    query: listQuery({}, ['name', 'createdAt', 'updatedAt']),
   },
   {
     name: 'analytics costs projects get',
@@ -52,7 +52,7 @@ export const analyticsCommands: CommandSpec[] = [
     name: 'analytics costs budgets list',
     method: 'GET',
     path: '/analytics/costs/budgets',
-    query: listQuery({ project: { apiName: 'project', maxLength: 200 } }),
+    query: listQuery({ project: { apiName: 'project', maxLength: 200 } }, ['name', 'createdAt', 'updatedAt']),
   },
   {
     name: 'analytics costs budgets create',
@@ -81,7 +81,7 @@ export const analyticsCommands: CommandSpec[] = [
     name: 'analytics costs budgets comparisons',
     method: 'GET',
     path: '/analytics/costs/budgets/comparisons',
-    query: listQuery(),
+    query: listQuery({}, ['name', 'createdAt', 'updatedAt']),
   },
   {
     name: 'analytics costs forecast',
@@ -107,5 +107,9 @@ export const analyticsCommands: CommandSpec[] = [
       project: { apiName: 'project', maxLength: 200 },
     },
     requiredOptions: ['current-start', 'current-end', 'previous-start', 'previous-end'],
+    dateRange: [
+      { startOption: 'current-start', endOption: 'current-end', maxDays: 366 },
+      { startOption: 'previous-start', endOption: 'previous-end', maxDays: 366 },
+    ],
   },
 ];

@@ -1,3 +1,4 @@
+import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { ApiError, NetworkError, ValidationError } from '../core/errors.js';
 import { validateBaseUrl } from '../config/url.js';
@@ -80,7 +81,7 @@ export class ApiClient {
                 }, this.timeoutMs);
                 const request = this.options.fetch
                     ? this.fetchImplementation(url, init)
-                    : nodeHttpsRequest(url, method, headers, init.body, this.maxResponseBytes);
+                    : nodeNativeRequest(url, method, headers, init.body, this.maxResponseBytes);
                 void request.then(resolve, reject);
             });
         }
@@ -105,9 +106,10 @@ export function buildHttpsRequestOptions(url, method, headers) {
         servername: url.hostname,
     };
 }
-function nodeHttpsRequest(url, method, headers, body, maxResponseBytes) {
+function nodeNativeRequest(url, method, headers, body, maxResponseBytes) {
     return new Promise((resolve, reject) => {
-        const request = httpsRequest(buildHttpsRequestOptions(url, method, headers), (response) => {
+        const requestImplementation = url.protocol === 'http:' ? httpRequest : httpsRequest;
+        const request = requestImplementation(buildHttpsRequestOptions(url, method, headers), (response) => {
             const chunks = [];
             let totalBytes = 0;
             let settled = false;
@@ -165,7 +167,7 @@ async function parseResponse(response, maxResponseBytes) {
         return JSON.parse(text);
     }
     catch {
-        return undefined;
+        throw new NetworkError('KooyaHQ API returned invalid JSON.');
     }
 }
 async function readBoundedResponseText(response, maxResponseBytes) {

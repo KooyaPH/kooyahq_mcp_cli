@@ -99,6 +99,9 @@ jobs:
           node dist/bin/kooyahq.js --skill tickets create --output json >/dev/null
         shell: bash
 
+      - name: Smoke-test local Git global installation and command shim
+        run: node scripts/smoke-git-install.mjs
+
   required:
     name: Required checks
     runs-on: [self-hosted, Linux]

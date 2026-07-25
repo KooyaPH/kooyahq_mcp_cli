@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { writeConfig } from '../src/config/store.js';
-import { runCli, type RuntimeDependencies } from '../src/runtime/run.js';
+import { defaultDependencies, runCli, type RuntimeDependencies } from '../src/runtime/run.js';
 
 function dependencies(overrides: Partial<RuntimeDependencies> = {}): RuntimeDependencies {
   return {
@@ -27,6 +27,11 @@ function dependencies(overrides: Partial<RuntimeDependencies> = {}): RuntimeDepe
     ...overrides,
   };
 }
+
+test('installed defaults select the IPv4-capable native transport', () => {
+  const defaults = defaultDependencies('0.1.0', async () => '');
+  assert.equal(defaults.fetch, undefined);
+});
 
 test('does not send network traffic when credentials are missing', async () => {
   let networkCalls = 0;
@@ -64,6 +69,20 @@ test('renders command help before configuration without sending network traffic'
   assert.match(lines.join('\n'), /Examples:/);
   assert.match(lines.join('\n'), /Exactly one:/);
   assert.doesNotMatch(lines.join('\n'), /secret-access-key/i);
+});
+
+test('resolves command help when command arguments appear before --help', async () => {
+  const lines: string[] = [];
+  const code = await runCli(
+    ['tickets', 'create', '--board-key', 'OPS', '--ticket-type', 'task', '--help'],
+    dependencies({
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }),
+  );
+
+  assert.equal(code, 0);
+  assert.match(lines.join('\n'), /KooyaHQ command: tickets create/);
+  assert.doesNotMatch(lines.join('\n'), /KooyaHQ internal command-line client/);
 });
 
 test('root and group help list every matching command with a concise summary', async () => {
@@ -112,7 +131,7 @@ test('renders the command skill as stable JSON for automation', async () => {
 
   assert.equal(code, 0);
   const document = JSON.parse(lines.join('\n'));
-  assert.equal(document.schemaVersion, 1);
+  assert.equal(document.schemaVersion, 2);
   assert.equal(document.command, 'tickets create');
   assert.equal(document.method, 'POST');
   assert.equal(typeof document.summary, 'string');
@@ -125,7 +144,7 @@ test('renders the command skill as stable JSON for automation', async () => {
   );
   assert.equal(
     document.parameters.find((parameter: { name: string }) => parameter.name === 'board-id').required,
-    true,
+    false,
   );
   assert.doesNotMatch(lines.join('\n'), /secretAccessKey|secret-access-key/i);
 });
@@ -141,7 +160,7 @@ test('renders root and group skills as command discovery documents', async () =>
     }));
     assert.equal(code, 0);
     const document = JSON.parse(lines.join('\n'));
-    assert.equal(document.schemaVersion, 1);
+    assert.equal(document.schemaVersion, 2);
     assert.ok(Array.isArray(document.commands));
     assert.ok(document.commands.some((command: { name: string }) => command.name === 'tickets create'));
     assert.equal(typeof document.workflow, 'string');
@@ -210,6 +229,57 @@ test('fetches every page for a paginated list only when --all is explicit', asyn
   assert.deepEqual(JSON.parse(lines.join('\n')).data, [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }]);
 });
 
+test('stops --all before retaining more than the configured item limit', async () => {
+  let calls = 0;
+  const errors: string[] = [];
+  const code = await runCli(
+    ['projects', 'list', '--all', '--limit', '2', '--output', 'json'],
+    dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      allPagesLimits: { maxPages: 10, maxItems: 2, maxBytes: 1_000 },
+      fetch: async () => {
+        calls += 1;
+        return new Response(JSON.stringify({
+          data: calls === 1 ? [{ id: 'p1' }, { id: 'p2' }] : [{ id: 'p3' }],
+          pagination: { page: calls, limit: 2, totalPages: 2 },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+      output: { stdout: () => undefined, stderr: (value) => errors.push(value) },
+    }),
+  );
+
+  assert.equal(code, 2);
+  assert.equal(calls, 2);
+  assert.match(errors.join('\n'), /exceeded the 2-item safety limit/);
+});
+
+test('stops --all before retaining more than the configured byte limit', async () => {
+  const errors: string[] = [];
+  const code = await runCli(
+    ['projects', 'list', '--all', '--output', 'json'],
+    dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      allPagesLimits: { maxPages: 10, maxItems: 100, maxBytes: 10 },
+      fetch: async () => new Response(JSON.stringify({
+        data: [{ name: 'larger than ten bytes' }],
+        pagination: { page: 1, limit: 100, totalPages: 1 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } }),
+      output: { stdout: () => undefined, stderr: (value) => errors.push(value) },
+    }),
+  );
+
+  assert.equal(code, 2);
+  assert.match(errors.join('\n'), /exceeded the 10-byte safety limit/);
+});
+
 test('loads a bounded JSON ticket import file before sending a preview request', async () => {
   const requests: Array<{ url: string; body: unknown }> = [];
   const code = await runCli([
@@ -243,9 +313,38 @@ test('loads a bounded JSON ticket import file before sending a preview request',
     url: 'https://example.com/api/cli/v1/tickets/import/preview',
     body: {
       boardId: 'board-1',
-      tickets: [{ title: 'Release', ticketType: 'task' }],
+      rows: [{ title: 'Release', ticketType: 'task' }],
     },
   }]);
+});
+
+test('honors the backend pagination pages field without sending an extra request', async () => {
+  let calls = 0;
+  const lines: string[] = [];
+  const code = await runCli(
+    ['projects', 'list', '--all', '--limit', '2', '--output', 'json'],
+    dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      fetch: async () => {
+        calls += 1;
+        return new Response(JSON.stringify({
+          data: [{ id: 'p1' }, { id: 'p2' }],
+          pagination: { page: 1, limit: 2, total: 2, pages: 1 },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+      output: { stdout: (value) => lines.push(value), stderr: () => undefined },
+    }),
+  );
+
+  assert.equal(code, 0);
+  assert.equal(calls, 1);
+  const response = JSON.parse(lines.join('\n'));
+  assert.equal(response.pagination.pages, 1);
+  assert.equal(response.pagination.all, true);
 });
 
 test('maps API status failures to stable exit codes without exposing credentials', async () => {

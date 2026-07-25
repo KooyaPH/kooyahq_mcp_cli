@@ -15,7 +15,7 @@ export interface OptionSpec {
   type?: ValueType;
   choices?: string[];
   numericChoices?: number[];
-  constant?: string | number | boolean | null;
+  constant?: string | number | boolean | null | unknown[] | Record<string, unknown>;
   format?: 'date' | 'datetime' | 'https-url' | 'hex-color' | 'email' | 'board-key' | 'ticket-key';
   min?: number;
   max?: number;
@@ -54,6 +54,17 @@ export interface ConditionalRequirement {
   value: string;
 }
 
+export interface DateRangeSpec {
+  startOption: string;
+  endOption: string;
+  maxDays: number;
+}
+
+export interface DateTimeRangeSpec {
+  startOption: string;
+  endOption: string;
+}
+
 export interface CommandSpec {
   name: string;
   method: HttpMethod;
@@ -72,13 +83,14 @@ export interface CommandSpec {
   confirmation?: string;
   timerEligibility?: TimerEligibility;
   fileInput?: FileInputSpec;
-  dateRange?: {
-    startOption: string;
-    endOption: string;
-    maxDays: number;
-  };
+  dateRange?: DateRangeSpec | DateRangeSpec[];
+  dateTimeRange?: DateTimeRangeSpec | DateTimeRangeSpec[];
   conditionalRequirements?: ConditionalRequirement[];
   pairedOptions?: string[][];
+  response?: {
+    description: string;
+    fields?: string[];
+  };
 }
 
 export type OutputFormat = 'table' | 'json' | 'raw';

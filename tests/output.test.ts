@@ -9,3 +9,12 @@ test('prints explicit raw text without JSON quoting', () => {
     'name,email\nUser,user@example.com',
   );
 });
+
+test('removes terminal control characters from table cells and headers only', () => {
+  const value = [{ 'na\u001bme': 'safe\u001b]52;c;copied\u0007\nnext' }];
+  const table = formatOutput(value, 'table');
+
+  assert.doesNotMatch(table, /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/);
+  assert.match(table, /safe.*next/);
+  assert.equal(formatOutput('safe\u001b]52;c;copied\u0007', 'raw'), 'safe\u001b]52;c;copied\u0007');
+});

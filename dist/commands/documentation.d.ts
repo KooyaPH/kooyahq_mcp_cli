@@ -8,5 +8,6 @@ export declare function commandDocumentation(command: CommandSpec): CommandDocum
 export declare function commandSummary(command: CommandSpec): string;
 export declare function workflowFor(scope: string): string;
 export declare function commandExamples(command: CommandSpec): string[];
+export declare function optionDescription(name: string, location: 'path' | 'query' | 'body' | 'input'): string;
 export declare function optionValueLabel(spec: OptionSpec): string;
 export declare function optionConstraints(spec: OptionSpec): string[];

@@ -57,6 +57,11 @@ export function commandDocumentation(command) {
     };
 }
 export function commandSummary(command) {
+    if (command.name === 'tickets improve')
+        return 'Preview AI improvement suggestions for a ticket.';
+    if (command.name === 'tickets improve-draft') {
+        return 'Preview AI improvement suggestions for a ticket draft.';
+    }
     const tokens = command.name.split(' ');
     const action = tokens.at(-1);
     const subject = tokens.slice(0, -1).join(' ');
@@ -94,10 +99,39 @@ export function commandExamples(command) {
         if (spec.type !== 'switch')
             parts.push(sampleFor(name, spec));
     }
+    if (command.fileInput)
+        parts.push('--file', 'tickets.json');
     const invocation = parts.join(' ');
     return command.method === 'GET'
         ? [invocation, `${invocation} --output json`]
         : [`${invocation} --dry-run --output json`, invocation];
+}
+export function optionDescription(name, location) {
+    const descriptions = {
+        page: 'One-based result page to request.',
+        limit: 'Maximum results to return per page.',
+        sort: 'Allowlisted response field used to sort results.',
+        order: 'Sort direction used with --sort.',
+        search: 'Text used to narrow matching results.',
+        'start-date': 'Inclusive calendar-date lower bound.',
+        'end-date': 'Inclusive calendar-date upper bound.',
+        'start-time': 'ISO 8601 timestamp when tracked work started.',
+        'end-time': 'ISO 8601 timestamp when tracked work ended.',
+        file: 'Path to the bounded ticket import file.',
+        stdin: 'Read the bounded ticket import payload from standard input.',
+        format: 'Input or output representation accepted by this command.',
+        direction: 'Blocker relationship direction; defaults to all.',
+    };
+    if (descriptions[name])
+        return descriptions[name];
+    if (name.endsWith('-id'))
+        return `Exact ${humanize(name.slice(0, -3))} identifier.`;
+    if (name.endsWith('-key'))
+        return `Exact ${humanize(name.slice(0, -4))} key.`;
+    if (name.endsWith('-ids'))
+        return `Comma-separated exact ${humanize(name.slice(0, -4))} identifiers.`;
+    const action = location === 'query' ? 'Filter or request value' : location === 'body' ? 'Request field' : 'Resource selector';
+    return `${action} for ${humanize(name)}.`;
 }
 export function optionValueLabel(spec) {
     if (spec.type === 'switch')
@@ -159,6 +193,12 @@ function sampleFor(name, spec) {
         return 'https://example.com';
     if (spec.format === 'hex-color')
         return '#2563eb';
+    if (spec.format === 'email')
+        return 'user@example.com';
+    if (spec.format === 'board-key')
+        return 'OPS';
+    if (spec.format === 'ticket-key')
+        return 'OPS-42';
     if (spec.type === 'boolean')
         return 'true';
     if (spec.type === 'integer' || spec.type === 'number')
@@ -167,8 +207,13 @@ function sampleFor(name, spec) {
         return "'{}'";
     if (spec.type === 'json-array')
         return "'[]'";
-    if (spec.type === 'csv')
+    if (spec.type === 'csv') {
+        if (name === 'projects')
+            return 'Project-A,Project-B';
+        if (name.includes('permission'))
+            return 'projects.read,time.read';
         return 'value-1,value-2';
+    }
     if (name.endsWith('-date'))
         return '2026-07-25';
     if (name === 'title')
@@ -177,7 +222,17 @@ function sampleFor(name, spec) {
         return '"Example"';
     if (name === 'email')
         return 'user@example.com';
-    return `<${name}>`;
+    if (name === 'board-key')
+        return 'OPS';
+    if (name === 'ticket-key' || name.endsWith('-ticket-key'))
+        return 'OPS-42';
+    if (name.endsWith('-id'))
+        return `${name.slice(0, -3).replace(/-/g, '_')}_123`;
+    if (name.endsWith('-key'))
+        return `${name.slice(0, -4).replace(/-/g, '_')}_key`;
+    if (name === 'id')
+        return 'resource_123';
+    return 'example-value';
 }
 function humanize(value) {
     return value.replace(/-/g, ' ');

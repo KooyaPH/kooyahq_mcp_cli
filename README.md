@@ -69,7 +69,7 @@ Configuration locations and protections:
 
 - Linux/macOS: `~/.kooyahq/config.json`, directory mode `0700`, file mode `0600`
 - Windows: `%USERPROFILE%\.kooyahq\config.json`, private ACL for the current account and `SYSTEM`
-- Writes use a same-directory temporary file and atomic rename
+- Writes use a same-directory temporary file and atomic rename. On Windows the directory and empty temporary file are protected before the secret is written; an existing config is restored if final ACL hardening fails.
 
 For non-interactive jobs, set all three variables together. A blank or partial set fails before any request is sent:
 
@@ -97,7 +97,7 @@ kooyahq --skill tickets create
 kooyahq --skill tickets create --output json
 ```
 
-Command help includes the workflow, exact flags, enum values, required groups, conditional parameters, compatibility aliases, examples, and security behavior. `--skill ... --output json` is a stable, machine-readable command contract intended for automation and AI tools.
+Command help includes the workflow, exact flags, enum values, required groups, conditional parameters, compatibility aliases, shell-safe examples, response notes, and security behavior. `--skill ... --output json` emits schema version 2: a stable, machine-readable command contract with parameter descriptions, truthful exactly-one groups, import schemas, and response metadata for automation and AI tools.
 
 Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, and `--ticket-key`. Legacy positional IDs remain deprecated compatibility aliases until the next major version.
 
@@ -218,6 +218,10 @@ tickets development clear
 
 Ticket IDs and keys are exact selectors. Board-scoped list/create/import commands require exactly one board ID or board key. Ticket mutations cover the web application's lifecycle, comments, assignments, relationships, blockers, hierarchy, acceptance criteria, documents, and GitHub development data.
 
+Ticket creation accepts optional, mutually exclusive `--parent-ticket-id|--parent-ticket-key` and `--root-epic-id|--root-epic-key` selectors. Move anchors accept exact ID or key variants for `before` and `after`, plus `--first` or `--last`. `tickets improve` and `tickets improve-draft` return preview suggestions only; use `--user-command` for optional guidance. They do not apply fields automatically.
+
+Document links do not have persistent document IDs. Add a document with exact `--name`, `--url`, and `--type`; remove it by the same exact `--url`. Blocker reads accept `--direction blocked-by|blocking|all` (default `all`) and return a `{ blockedBy, blocking }` relationship envelope.
+
 Ticket imports accept JSON or CSV from a file or standard input, never both:
 
 ```sh
@@ -225,7 +229,9 @@ kooyahq tickets import preview --board-key OPS --file tickets.csv
 kooyahq tickets import apply --board-key OPS --stdin --format json
 ```
 
-Input must be UTF-8 and is limited to 5 MiB and 250 tickets. CSV headers are allowlisted. Quoted CSV fields and the frontend's flattened JSON fields are normalized locally.
+Input must be UTF-8 and is limited to 5 MiB and 250 tickets. JSON input is an array of row objects. Supported row fields are `importRef`, `title`, `ticketType`, `status`, `priority`, `reporterEmail`, `assigneeEmail`, `points`, `tags`, `parentRef`, `rootEpicRef`, `startDate`, `endDate`, `dueDate`, `description`, `acceptanceCriteria`, `documents`, `comments`, `relatedRefs`, and `github`.
+
+CSV headers are strictly allowlisted: `importRef`, `title`, `ticketType`, `status`, `priority`, `reporterEmail`, `assigneeEmail`, `points`, `tags`, `parentRef`, `rootEpicRef`, `startDate`, `endDate`, `dueDate`, `description`, `acceptanceCriteriaJson`, `documentsJson`, `commentsJson`, `relatedRefs`, `githubBranchName`, `githubTargetBranch`, `githubPullRequestUrl`, and `githubStatus`. Quoted CSV fields and flattened JSON fields are normalized locally. The CLI sends normalized rows under the backend's `rows` contract.
 
 ### Time tracking
 
@@ -251,7 +257,7 @@ time workday summary
 time workday end
 ```
 
-Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. `start-many` accepts at most 20 unique projects. Team entry reads require `--scope team`, and `--user-id` is rejected without that explicit scope. The backend still checks the user's time-entry permission.
+Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. `start-many` accepts at most 20 unique projects. Team entry reads require `--scope team`, and `--user-id` is rejected without that explicit scope. Entry list dates use strict `YYYY-MM-DD` values and a maximum 366-day ordered range. Entry timestamps must be zoned ISO 8601 values and are checked for ordering when both are present. The backend still checks the user's time-entry permission.
 
 ### Analytics and budgets
 
@@ -292,7 +298,7 @@ users templates list
 users templates get
 ```
 
-`users list --all --output json` is the assignment-friendly user lookup. Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Use `users export --format csv --output raw` for a CSV stream.
+`users list --all --output json` is the assignment-friendly user lookup. Management, client creation, salary fields, activity logs, exports, permission changes, and templates remain permission-gated by the backend. Use `users export --format csv --output raw` for a CSV stream. User create/update supports `--whatsapp-phone`; update supports `--clear-whatsapp-phone`. Use `--clear-permissions` to intentionally send an empty permission array instead of passing an ambiguous blank CSV value.
 
 ### Notifications
 
@@ -323,7 +329,7 @@ Global command behavior:
 - `--output json` preserves structured API responses.
 - `--output raw` is intended for text exports.
 - `--dry-run` validates and prints the request without reading credentials or sending traffic.
-- `--all` fetches paginated GET results sequentially, with a 1,000-page safety cap.
+- `--all` fetches paginated GET results sequentially with hard aggregate caps of 1,000 pages, 100,000 items, and 50 MiB of retained JSON data.
 - `--yes` skips a documented confirmation; it is rejected on commands that do not support it.
 - Mutations are never retried. GET transport failures are retried at most twice after the first attempt.
 
@@ -332,14 +338,20 @@ Examples:
 ```sh
 kooyahq boards get --board-key OPS --output json
 kooyahq boards members add --board-key OPS --user-id user_123 --role member --dry-run
-kooyahq tickets list --board-key OPS --assignee-id user_123 --sort priority --order desc --all --output json
+kooyahq tickets list --board-key OPS --assignee-id user_123 --sort createdAt --order desc --all --output json
 kooyahq tickets create --board-key OPS --ticket-type task --title "Release" --assignee-id user_123 --dry-run
+kooyahq tickets create --board-key OPS --ticket-type subtask --title "Release test" --parent-ticket-key OPS-42 --root-epic-key OPS-1 --dry-run
+kooyahq tickets improve --ticket-key OPS-42 --user-command "Focus on rollback safety" --output json
+kooyahq tickets documents add --ticket-key OPS-42 --name "Release plan" --type doc --url https://example.com/release-plan
+kooyahq tickets documents remove --ticket-key OPS-42 --url https://example.com/release-plan
+kooyahq tickets blockers list --ticket-key OPS-42 --direction blocked-by --output json
 kooyahq tickets blockers add --ticket-key OPS-42 --blocker-ticket-key OPS-12
 kooyahq time timers start-many --projects Project-A,Project-B --task "Review"
 kooyahq time entries list --scope team --user-id user_123 --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq analytics team --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq notifications list --unread-only true --all --output json
 kooyahq users list --search "Alex" --all --output json
+kooyahq users update --user-id user_123 --clear-whatsapp-phone --clear-permissions --dry-run
 ```
 
 ## Authorization, auditing, and security
@@ -354,9 +366,12 @@ Client security behavior:
 - Credentials are sent only to the validated origin with `Authorization: KooyaKey <id>:<secret>`.
 - Redirects are rejected so credentials cannot cross origins.
 - Requests time out after 30 seconds and response bodies are limited to 10 MiB.
+- The default Node transport supports HTTP only for localhost development and forces IPv4 for HTTPS backend requests.
+- Malformed JSON responses fail as protocol errors instead of being treated as empty success responses.
 - Secrets are never printed by `configure show`, help, skills, or dry-run output.
 - Reflected credentials are redacted from API error messages.
 - Configuration uses private filesystem permissions and atomic writes.
+- Human-readable tables remove terminal control characters; JSON and raw output remain structurally unmodified for scripting.
 - Do not put secrets in shell history, tickets, chat, screenshots, repositories, or command flags.
 
 Revoke a compromised key in the user's KooyaHQ profile, remove it from CI/environment storage, and run `kooyahq configure clear`. Clearing the local file alone does not revoke the server-side key.
@@ -394,4 +409,4 @@ git diff --exit-code -- dist
 npm audit --omit=dev
 ```
 
-CI verifies Node.js 18, 20, 22, and 24 on Linux, checks that committed `dist/` matches the TypeScript source, packs and installs the artifact, and smoke-tests Linux, macOS, and Windows. The repository has no npm publication or deployment workflow.
+CI verifies Node.js 18, 20, 22, and 24 on Linux, checks that committed `dist/` matches the TypeScript source, packs and installs the artifact, and smoke-tests Linux, macOS, and Windows. Each operating-system job also performs a local Git global installation into an isolated prefix and executes the generated command shim. The repository has no npm publication or deployment workflow.

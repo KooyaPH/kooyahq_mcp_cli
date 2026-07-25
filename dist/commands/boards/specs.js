@@ -60,7 +60,7 @@ const settingsBody = {
 export const boardCommands = [
     { name: 'boards list', method: 'GET', path: '/boards', query: listQuery({
             search: { apiName: 'search' }, type: { apiName: 'type', choices: ['kanban', 'sprint'] },
-        }) },
+        }, ['updatedAt']) },
     {
         name: 'boards get',
         method: 'GET',
@@ -89,8 +89,8 @@ export const boardCommands = [
             ...settingsBody,
         }, requireBody: true, atMostOne: [['description', 'clear-description']] },
     { name: 'boards members list', method: 'GET', ...legacyBoardScope('/members', 'boardId'), query: listQuery({
-            search: { apiName: 'search' }, role: { apiName: 'role' },
-        }) },
+            search: { apiName: 'search' }, role: { apiName: 'role', choices: ['admin', 'member', 'viewer'] },
+        }, ['joinedAt']) },
     {
         name: 'boards members add',
         method: 'POST',
@@ -137,13 +137,13 @@ export const boardCommands = [
         requiredOptions: ['user-id'],
         confirmation: 'Remove board member?',
     },
-    { name: 'boards activities list', method: 'GET', ...boardScope('/activities'), query: listQuery() },
+    { name: 'boards activities list', method: 'GET', ...boardScope('/activities'), query: listQuery({}, ['occurredAt', 'createdAt']) },
     { name: 'boards mentions list', method: 'GET', ...boardScope('/mention-candidates'), query: listQuery({
             search: { apiName: 'search' },
-        }) },
+        }, ['name', 'email']) },
     { name: 'boards assignees list', method: 'GET', ...boardScope('/assignee-candidates'), query: listQuery({
             search: { apiName: 'search' },
-        }) },
+        }, ['name', 'email']) },
     { name: 'boards columns list', method: 'GET', ...boardScope('/columns') },
     {
         name: 'boards columns add',

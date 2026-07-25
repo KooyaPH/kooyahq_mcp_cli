@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import test from 'node:test';
 
 import { ApiClient, buildHttpsRequestOptions } from '../src/http/client.js';
@@ -14,6 +15,28 @@ test('default HTTPS transport forces IPv4 DNS lookup for backend requests', () =
   assert.equal(options.family, 4);
   assert.equal(options.servername, 'hq-be.kooyaai.com');
   assert.equal(options.path, '/api/cli/v1/projects?limit=1');
+});
+
+test('default transport supports an allowed HTTP localhost origin', async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"ok":true}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    const client = new ApiClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+      version: '1.0.0',
+      retryDelayMs: 1,
+    });
+    assert.deepEqual(await client.request('GET', '/whoami'), { ok: true });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 test('sends the exact authorization and user-agent headers and rejects redirects', async () => {
@@ -175,6 +198,19 @@ test('returns bounded text responses for explicit export commands', async () => 
     await client.request('GET', '/users/export', { query: { format: 'csv' } }),
     'name,email\nUser,user@example.com',
   );
+});
+
+test('rejects malformed JSON responses as a protocol error', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://example.com', accessKeyId: 'id', secretAccessKey: 'secret',
+    version: '1.0.0',
+    fetch: async () => new Response('{"data":', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
+  });
+
+  await assert.rejects(client.request('GET', '/projects'), /invalid JSON/);
 });
 
 test('extracts nested API error messages safely', async () => {

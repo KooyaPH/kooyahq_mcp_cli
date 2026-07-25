@@ -1,6 +1,8 @@
 import { commandCatalog } from '../commands/catalog.js';
-import { commandDocumentation, commandSummary, optionConstraints, optionValueLabel, workflowFor, } from '../commands/documentation.js';
+import { commandDocumentation, commandSummary, optionConstraints, optionDescription, optionValueLabel, workflowFor, } from '../commands/documentation.js';
 import { ValidationError } from '../core/errors.js';
+import { TICKET_IMPORT_CSV_HEADERS, TICKET_IMPORT_ROW_FIELDS, } from '../input/ticket-import.js';
+const SKILL_SCHEMA_VERSION = 2;
 export function skillOutput(argv) {
     const { scope, format } = parseSkillArguments(argv);
     const name = scope.join(' ');
@@ -51,7 +53,7 @@ Every network request requires a configured KooyaHQ access key. The backend auth
 function catalogSkillDocument(scope, commands) {
     const domain = scope[0] ?? 'root';
     return {
-        schemaVersion: 1,
+        schemaVersion: SKILL_SCHEMA_VERSION,
         scope: scope.join(' ') || 'root',
         workflow: workflowFor(domain),
         authentication: authenticationDocument(),
@@ -91,6 +93,8 @@ function commandSkillMarkdown(command) {
         ...(command.atMostOne ?? []).map((group) => `- At most one of: ${group.map(flagName).join(', ')}.`),
         ...(command.conditionalRequirements ?? []).map((rule) => `- \`--${rule.option}\` requires \`--${rule.requires} ${rule.value}\`.`),
         ...(command.pairedOptions ?? []).map((group) => `- Supply together or omit together: ${group.map(flagName).join(', ')}.`),
+        ...rangeDocuments(command.dateRange).map((range) => `- Date range: \`--${range.startOption}\` through \`--${range.endOption}\`, maximum ${range.maxDays} days.`),
+        ...rangeDocuments(command.dateTimeRange).map((range) => `- Timestamp order: \`--${range.startOption}\` must not be after \`--${range.endOption}\`.`),
     ];
     return `# KooyaHQ CLI Skill
 
@@ -122,6 +126,8 @@ ${relationships.length > 0 ? `\n## Parameter relationships\n\n${relationships.jo
 
 ${documentation.examples.map((example) => `\`\`\`sh\n${example}\n\`\`\``).join('\n\n')}
 
+${command.response ? `## Response\n\n${command.response.description}${command.response.fields?.length ? ` Fields: ${command.response.fields.map((field) => `\`${field}\``).join(', ')}.` : ''}\n` : ''}
+
 ## Safety
 
 Local validation runs before authentication or network traffic. Mutations are never retried automatically, and destructive commands require confirmation unless \`--yes\` is explicit. Responses and credentials are not written to CLI audit records.
@@ -135,10 +141,35 @@ function commandSkillDocument(command) {
         ...parameterDocuments(command, command.body ?? {}, 'body'),
     ];
     if (command.fileInput) {
-        parameters.push({ name: 'file', location: 'input', type: 'string', required: false }, { name: 'stdin', location: 'input', type: 'switch', required: false }, { name: 'format', location: 'input', type: 'string', required: false, choices: ['json', 'csv'] });
+        parameters.push({
+            name: 'file',
+            location: 'input',
+            type: 'string',
+            required: false,
+            requiredByExactlyOneGroup: true,
+            description: optionDescription('file', 'input'),
+        }, {
+            name: 'stdin',
+            location: 'input',
+            type: 'switch',
+            required: false,
+            requiredByExactlyOneGroup: true,
+            description: optionDescription('stdin', 'input'),
+        }, {
+            name: 'format',
+            location: 'input',
+            type: 'string',
+            required: false,
+            choices: ['json', 'csv'],
+            description: optionDescription('format', 'input'),
+        });
     }
+    const exactlyOne = [
+        ...(command.exactlyOne ?? []),
+        ...(command.fileInput ? [['file', 'stdin']] : []),
+    ];
     return {
-        schemaVersion: 1,
+        schemaVersion: SKILL_SCHEMA_VERSION,
         command: command.name,
         summary: documentation.summary,
         workflow: documentation.workflow,
@@ -147,23 +178,42 @@ function commandSkillDocument(command) {
         paths: command.pathVariants?.map((variant) => variant.path) ?? [command.path],
         authentication: authenticationDocument(),
         parameters,
-        exactlyOne: command.exactlyOne ?? [],
+        exactlyOne,
         atMostOne: command.atMostOne ?? [],
         conditionalRequirements: command.conditionalRequirements ?? [],
         pairedOptions: command.pairedOptions ?? [],
+        dateRanges: rangeDocuments(command.dateRange),
+        dateTimeRanges: rangeDocuments(command.dateTimeRange),
         confirmationRequired: Boolean(command.confirmation),
         supportsDryRun: true,
         supportsAllPages: Boolean(command.query?.page && command.query.limit),
         mutationRetries: false,
+        ...(command.response ? { response: command.response } : {}),
+        ...(command.fileInput ? {
+            input: {
+                formats: ['json', 'csv'],
+                exactlyOne: ['file', 'stdin'],
+                jsonShape: 'array',
+                maxBytes: command.fileInput.maxBytes,
+                maxItems: command.fileInput.maxItems,
+                rowFields: TICKET_IMPORT_ROW_FIELDS,
+                csvHeaders: TICKET_IMPORT_CSV_HEADERS,
+            },
+        } : {}),
     };
+}
+function rangeDocuments(range) {
+    if (!range)
+        return [];
+    return Array.isArray(range) ? range : [range];
 }
 function parameterDocuments(command, definitions, location) {
     return Object.entries(definitions).map(([name, definition]) => ({
         name,
         location,
         type: definition.type ?? 'string',
-        required: Boolean(command.requiredOptions?.includes(name)
-            || command.exactlyOne?.some((group) => group.includes(name))),
+        description: optionDescription(name, location),
+        required: Boolean(command.requiredOptions?.includes(name)),
         requiredDirectly: Boolean(command.requiredOptions?.includes(name)),
         requiredByExactlyOneGroup: Boolean(command.exactlyOne?.some((group) => group.includes(name))),
         ...(definition.choices ? { choices: definition.choices } : {}),
@@ -214,7 +264,7 @@ function skillOption(flag, definition, required, oneOf) {
     const requirement = required ? 'required' : oneOf ? 'required group' : 'optional';
     const constraints = optionConstraints(definition);
     const details = [requirement, ...constraints].join('; ');
-    return `- \`--${flag}${value ? ` ${value}` : ''}\`: ${details}.`;
+    return `- \`--${flag}${value ? ` ${value}` : ''}\`: ${optionDescription(flag, 'body')} ${details}.`;
 }
 function flagName(value) {
     return `\`--${value}\``;

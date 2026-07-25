@@ -1,3 +1,4 @@
+import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import type { RequestOptions as HttpsRequestOptions } from 'node:https';
 
@@ -112,7 +113,7 @@ export class ApiClient {
         }, this.timeoutMs);
         const request = this.options.fetch
           ? this.fetchImplementation(url, init)
-          : nodeHttpsRequest(url, method, headers, init.body, this.maxResponseBytes);
+          : nodeNativeRequest(url, method, headers, init.body, this.maxResponseBytes);
         void request.then(resolve, reject);
       });
     } finally {
@@ -142,7 +143,7 @@ export function buildHttpsRequestOptions(
   };
 }
 
-function nodeHttpsRequest(
+function nodeNativeRequest(
   url: URL,
   method: string,
   headers: Headers,
@@ -150,7 +151,8 @@ function nodeHttpsRequest(
   maxResponseBytes: number,
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
-    const request = httpsRequest(buildHttpsRequestOptions(url, method, headers), (response) => {
+    const requestImplementation = url.protocol === 'http:' ? httpRequest : httpsRequest;
+    const request = requestImplementation(buildHttpsRequestOptions(url, method, headers), (response) => {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
       let settled = false;
@@ -203,7 +205,7 @@ async function parseResponse(response: Response, maxResponseBytes: number): Prom
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    return undefined;
+    throw new NetworkError('KooyaHQ API returned invalid JSON.');
   }
 }
 

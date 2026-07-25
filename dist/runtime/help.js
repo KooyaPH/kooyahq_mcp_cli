@@ -1,5 +1,5 @@
 import { commandCatalog } from '../commands/catalog.js';
-import { commandDocumentation, commandSummary, optionConstraints, optionValueLabel, workflowFor, } from '../commands/documentation.js';
+import { commandDocumentation, commandSummary, optionConstraints, optionDescription, optionValueLabel, workflowFor, } from '../commands/documentation.js';
 export function helpText(scope = []) {
     if (scope.length > 0) {
         const name = scope.join(' ');
@@ -69,6 +69,8 @@ function commandHelp(command) {
         ...(command.atMostOne ?? []).map((group) => `  At most one: ${group.map(flag).join(', ')}`),
         ...(command.conditionalRequirements ?? []).map((rule) => `  Conditional: --${rule.option} requires --${rule.requires} ${rule.value}`),
         ...(command.pairedOptions ?? []).map((group) => `  Together: ${group.map(flag).join(', ')}`),
+        ...rangeDocuments(command.dateRange).map((range) => `  Date range: --${range.startOption} through --${range.endOption}; maximum ${range.maxDays} days`),
+        ...rangeDocuments(command.dateTimeRange).map((range) => `  Timestamp order: --${range.startOption} must not be after --${range.endOption}`),
     ];
     const deprecated = (command.positionals ?? [])
         .filter((positional) => positional.deprecated && positional.aliasFor)
@@ -90,6 +92,7 @@ ${groups.length > 0 ? `\nRelationships:\n${groups.join('\n')}\n` : ''}${deprecat
 Examples:
 ${documentation.examples.map((example) => `  ${example}`).join('\n')}
 
+${command.response ? `Response:\n  ${command.response.description}\n\n` : ''}
 Security:
   The backend authorizes the acting access-key owner for every resource. This command cannot bypass board, team, or administrator permissions.`;
 }
@@ -105,9 +108,14 @@ function formatOption(name, definition, required, oneOf) {
     const value = optionValueLabel(definition);
     const requirement = required ? 'required' : oneOf ? 'required group' : '';
     const details = [requirement, ...optionConstraints(definition)].filter(Boolean);
-    return `  --${name}${value ? ` ${value}` : ''}${details.length > 0 ? `  (${details.join('; ')})` : ''}`;
+    return `  --${name}${value ? ` ${value}` : ''}  ${optionDescription(name, 'body')}${details.length > 0 ? ` (${details.join('; ')})` : ''}`;
 }
 function flag(value) {
     return `--${value}`;
+}
+function rangeDocuments(range) {
+    if (!range)
+        return [];
+    return Array.isArray(range) ? range : [range];
 }
 //# sourceMappingURL=help.js.map
