@@ -19,11 +19,9 @@ test('GitHub installs use committed dist files without compiling TypeScript', ()
   assert.ok(existsSync('scripts/prepare-git-install.mjs'));
 });
 
-test('README documents global GitHub install cleanup and configuration steps', () => {
+test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /npm install -g --install-links=true git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
   assert.match(readme, /npm uninstall -g kooyahq-cli/);
-  assert.match(readme, /unlink "\$bin_path"/);
-  assert.match(readme, /unlink "\$package_path"/);
   assert.match(readme, /hash -r/);
   assert.match(readme, /ENOTEMPTY/);
   assert.match(readme, /ENOTDIR/);

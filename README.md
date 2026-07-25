@@ -16,19 +16,13 @@ git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 Install or update from `main`:
 
 ```sh
-npm uninstall -g kooyahq-cli || true
-global_prefix="$(npm prefix -g)"
-bin_path="$global_prefix/bin/kooyahq"
-package_path="$global_prefix/lib/node_modules/kooyahq-cli"
-test -L "$bin_path" && unlink "$bin_path"
-test -L "$package_path" && unlink "$package_path"
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 hash -r
 kooyahq --version
 kooyahq --help
 ```
 
-The uninstall and symlink cleanup make the command repeatable across npm versions. `--install-links=true` is required for private GitHub installs. Without it, npm can leave `kooyahq-cli` as a dangling symlink into its temporary Git cache on some npm versions. The GitHub package ships compiled `dist/` files on `main`. During installation npm runs a dependency-free package check against those committed files; it does not compile TypeScript on your machine. To remove it:
+`--install-links=true` is required for private GitHub installs. Without it, npm can leave `kooyahq-cli` as a dangling symlink into its temporary Git cache on some npm versions. `hash -r` refreshes the current shell's command lookup after installation. The GitHub package ships compiled `dist/` files on `main`. During installation npm runs a dependency-free package check against those committed files; it does not compile TypeScript on your machine. To remove it:
 
 ```sh
 npm uninstall -g kooyahq-cli
@@ -43,13 +37,6 @@ Use PowerShell, Git for Windows, and Node.js 18 or newer:
 ```powershell
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm uninstall -g kooyahq-cli
-$globalPrefix = npm prefix -g
-$globalModules = npm root -g
-Remove-Item -Force (Join-Path $globalPrefix 'kooyahq.cmd') -ErrorAction SilentlyContinue
-if ((Test-Path (Join-Path $globalModules 'kooyahq-cli')) -and ((Get-Item (Join-Path $globalModules 'kooyahq-cli')).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-  Remove-Item -Force (Join-Path $globalModules 'kooyahq-cli')
-}
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
@@ -64,12 +51,6 @@ Use a POSIX shell, Git, OpenSSH, and Node.js 18 or newer:
 ```sh
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm uninstall -g kooyahq-cli || true
-global_prefix="$(npm prefix -g)"
-bin_path="$global_prefix/bin/kooyahq"
-package_path="$global_prefix/lib/node_modules/kooyahq-cli"
-test -L "$bin_path" && unlink "$bin_path"
-test -L "$package_path" && unlink "$package_path"
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 hash -r
 kooyahq --version
