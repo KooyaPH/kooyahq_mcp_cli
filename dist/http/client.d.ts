@@ -1,3 +1,4 @@
+import type { RequestOptions as HttpsRequestOptions } from 'node:https';
 import type { Credentials } from '../config/types.js';
 export declare const API_ROOT = "/api/cli/v1";
 type QueryValue = string | number | boolean | string[] | undefined;
@@ -24,4 +25,5 @@ export declare class ApiClient {
     constructor(options: ApiClientOptions);
     request<T = unknown>(method: string, path: string, requestOptions?: RequestOptions): Promise<T>;
 }
+export declare function buildHttpsRequestOptions(url: URL, method: string, headers: Headers): HttpsRequestOptions;
 export {};

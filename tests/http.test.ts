@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ApiClient } from '../src/http/client.js';
+import { ApiClient, buildHttpsRequestOptions } from '../src/http/client.js';
+
+test('default HTTPS transport forces IPv4 DNS lookup for backend requests', () => {
+  const options = buildHttpsRequestOptions(
+    new URL('https://hq-be.kooyaai.com/api/cli/v1/projects?limit=1'),
+    'GET',
+    new Headers({ accept: 'application/json' }),
+  );
+
+  assert.equal(options.hostname, 'hq-be.kooyaai.com');
+  assert.equal(options.family, 4);
+  assert.equal(options.servername, 'hq-be.kooyaai.com');
+  assert.equal(options.path, '/api/cli/v1/projects?limit=1');
+});
 
 test('sends the exact authorization and user-agent headers and rejects redirects', async () => {
   let captured: { input: string; init: RequestInit } | undefined;

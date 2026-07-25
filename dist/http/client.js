@@ -1,3 +1,4 @@
+import { request as httpsRequest } from 'node:https';
 import { ApiError, NetworkError, ValidationError } from '../core/errors.js';
 import { validateBaseUrl } from '../config/url.js';
 export const API_ROOT = '/api/cli/v1';
@@ -48,7 +49,10 @@ export class ApiClient {
                     controller.abort();
                     reject(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
                 }, this.timeoutMs);
-                void this.fetchImplementation(url, init).then(resolve, reject);
+                const request = this.options.fetch
+                    ? this.fetchImplementation(url, init)
+                    : nodeHttpsRequest(url, method, headers, init.body);
+                void request.then(resolve, reject);
             });
         }
         catch {
@@ -64,6 +68,39 @@ export class ApiClient {
         }
         return payload;
     }
+}
+export function buildHttpsRequestOptions(url, method, headers) {
+    return {
+        method,
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || undefined,
+        path: `${url.pathname}${url.search}`,
+        headers: Object.fromEntries(headers.entries()),
+        family: 4,
+        servername: url.hostname,
+    };
+}
+function nodeHttpsRequest(url, method, headers, body) {
+    return new Promise((resolve, reject) => {
+        const request = httpsRequest(buildHttpsRequestOptions(url, method, headers), (response) => {
+            const chunks = [];
+            response.on('data', (chunk) => {
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            });
+            response.on('end', () => {
+                resolve(new Response(Buffer.concat(chunks), {
+                    status: response.statusCode ?? 0,
+                    statusText: response.statusMessage ?? '',
+                    headers: response.headers,
+                }));
+            });
+        });
+        request.on('error', reject);
+        if (body !== undefined && body !== null)
+            request.write(body);
+        request.end();
+    });
 }
 async function parseResponse(response, maxResponseBytes) {
     const contentLength = response.headers.get('content-length');
