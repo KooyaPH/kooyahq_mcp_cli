@@ -348,7 +348,7 @@ time workday summary
 time workday end
 ```
 
-Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. `start-many` accepts at most 20 case-insensitively unique projects, with each project limited to 100 characters, and is all-or-nothing: the backend either starts the complete eligible batch or starts none. Timer and entry task text is limited to 1,000 characters; explicit durations are limited to 1,000,000 seconds. Timer, entry, and today's-entry lists support `--search`.
+Timer mutations always act on the authenticated key owner. A timer ID is optional for pause, resume, and stop only when exactly one eligible timer exists; the CLI never guesses among multiple timers. Timer project options require project display names: `--project`, `--projects`, and time-entry project options must name projects from `projects list`. Matching is case-insensitive and the backend stores the catalog display name. Project IDs are rejected by the server, as are blank or unknown names. `start-many` accepts at most 20 case-insensitively unique projects, with each project limited to 100 characters, and is all-or-nothing: the backend either starts the complete eligible batch or starts none. Timer and entry task text is limited to 1,000 characters; explicit durations are limited to 1,000,000 seconds. Timer, entry, and today's-entry lists support `--search`.
 
 Team entry reads require `--scope team`, and `--user-id` is rejected without that explicit scope. Entry list dates use strict `YYYY-MM-DD` values and span at most 366 inclusive calendar dates. Entry timestamps must be zoned ISO 8601 values and are checked for ordering when both are present. The backend still checks the user's time-entry permission.
 
@@ -446,7 +446,8 @@ kooyahq tickets documents add --ticket-key OPS-42 --name "Release plan" --type d
 kooyahq tickets documents remove --ticket-key OPS-42 --url https://example.com/release-plan
 kooyahq tickets blockers list --ticket-key OPS-42 --direction blocked-by --output json
 kooyahq tickets blockers add --ticket-key OPS-42 --blocker-ticket-key OPS-12
-kooyahq time timers start-many --projects Project-A,Project-B --task "Review"
+kooyahq time timers start --project "Project Alpha" --task "Release review"
+kooyahq time timers start-many --projects "Project Alpha,Project Beta" --task "Review"
 kooyahq time entries list --scope team --user-id 507f1f77bcf86cd799439011 --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq analytics time --user-id 507f1f77bcf86cd799439011 --start-date 2026-07-01 --end-date 2026-07-25 --output json
 kooyahq analytics team --start-date 2026-07-01 --end-date 2026-07-25 --output json

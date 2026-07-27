@@ -66,6 +66,13 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.doesNotMatch(readme, /global_prefix|globalPrefix|packagePath|binPath/);
 });
 
+test('README defines timer projects as display names rather than identifiers', () => {
+  assert.match(readme, /timer project options require project display names/i);
+  assert.match(readme, /project IDs are rejected by the server/i);
+  assert.match(readme, /kooyahq time timers start --project "Project Alpha" --task "Release review"/);
+  assert.doesNotMatch(readme, /time timers start --project project_\d+/i);
+});
+
 test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () => {
   assert.match(workflow, /git diff --exit-code -- dist/);
   assert.match(workflow, /ubuntu-latest/);
