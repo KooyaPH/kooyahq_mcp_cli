@@ -63,7 +63,7 @@ test('native transport sends a JSON body on DELETE requests', async () => {
       version: '1.0.0',
       retryDelayMs: 1,
     });
-    const body = { url: 'https://example.com/document' };
+    const body = { url: 'https://example.com/café' };
 
     assert.deepEqual(await client.request('DELETE', '/tickets/1/documents', { body }), { ok: true });
     assert.equal(receivedBody, JSON.stringify(body));
