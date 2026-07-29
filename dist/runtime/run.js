@@ -9,6 +9,7 @@ import { CliError, ConfigError, publicErrorMessage, ValidationError } from '../c
 import { ApiClient } from '../http/client.js';
 import { readBoundedFile, readBoundedStdin } from '../input/read-bounded.js';
 import { parseTicketImport } from '../input/ticket-import.js';
+import { runMcpSetupCommand } from '../mcp/setup/index.js';
 import { formatOutput } from '../output/format.js';
 import { helpText } from './help.js';
 import { skillOutput } from './skill.js';
@@ -50,6 +51,8 @@ export async function runCli(argv, dependencies) {
         }
         if (argv[0] === 'configure')
             return await runConfigure(argv.slice(1), dependencies);
+        if (argv[0] === 'mcp')
+            return await runMcpSetup(argv.slice(1), dependencies);
         const request = buildRequest(commandCatalog, argv);
         await materializeFileInput(request, dependencies);
         for (const warning of request.warnings ?? [])
@@ -86,6 +89,27 @@ export async function runCli(argv, dependencies) {
         dependencies.output.stderr(publicErrorMessage(error));
         return error instanceof CliError ? error.exitCode : 1;
     }
+}
+async function runMcpSetup(argv, dependencies) {
+    const result = await runMcpSetupCommand(argv, {
+        homeDirectory: dependencies.homeDirectory,
+        version: dependencies.version,
+        environment: dependencies.environment,
+        platform: dependencies.platform,
+        onlineCheck: async () => {
+            const exitCode = await runCli(['auth', 'whoami', '--output', 'json'], {
+                ...dependencies,
+                output: { stdout: () => undefined, stderr: () => undefined },
+            });
+            return exitCode === 0;
+        },
+        ...(dependencies.mcpSetup ? { overrides: dependencies.mcpSetup } : {}),
+    });
+    for (const line of result.stdout)
+        dependencies.output.stdout(line);
+    for (const line of result.stderr)
+        dependencies.output.stderr(line);
+    return result.exitCode;
 }
 function resolveHelpScope(argv) {
     const command = commandCatalog

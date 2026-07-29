@@ -28,6 +28,8 @@ hash -r
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
+kooyahq mcp install --client codex
+kooyahq mcp doctor --client codex
 ```
 
 ### Windows
@@ -44,8 +46,11 @@ kooyahq-mcp --version
 The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout. To uninstall:
 
 ```sh
+codex mcp remove kooyahq
 npm uninstall -g kooyahq-cli
 ```
+
+Also remove the installed kooyahq-cli skill directory: `${CODEX_HOME}/skills/kooyahq-cli` when `CODEX_HOME` is set, otherwise `~/.codex/skills/kooyahq-cli`. This leaves the separate `kooyahq-workflow` skill unchanged.
 
 ## Configure
 
@@ -107,7 +112,17 @@ Prefer explicit selectors such as `--board-id`, `--board-key`, `--ticket-id`, an
 
 ## Local stdio MCP server for AI tools
 
-The package also installs `kooyahq-mcp`, a local stdio MCP server for AI clients. It is not a hosted remote service. It runs on the user's machine, uses the same `kooyahq configure` profile or `KOOYAHQ_*` environment variables, and sends requests only through the same authenticated backend routes as the human CLI.
+The package also installs `kooyahq-mcp`, a local stdio MCP server for AI clients. It is not a hosted remote service. It runs on the user's machine, uses the same `kooyahq configure` profile or `KOOYAHQ_*` environment variables, and sends requests only through the same authenticated backend routes as the human CLI. It uses newline-delimited UTF-8 JSON-RPC, supports MCP protocol `2025-06-18`, and bounds each input message at 1 MiB.
+
+For Codex, use the deterministic installer and doctor instead of a bare command name:
+
+```sh
+kooyahq mcp install --client codex
+kooyahq mcp doctor --client codex
+kooyahq mcp doctor --client codex --online
+```
+
+The installer registers absolute Node.js and server-script paths and installs the packaged `kooyahq-cli` skill without changing an existing `kooyahq-workflow` skill. Restart Codex and open a new thread after installation so it reloads the MCP server and skills. The default doctor is offline; `--online` additionally checks the authenticated KooyaHQ profile without printing credentials.
 
 Typical MCP client configuration:
 
@@ -120,6 +135,8 @@ Typical MCP client configuration:
   }
 }
 ```
+
+The JSON above illustrates the transport shape for other clients. Codex users should use `kooyahq mcp install --client codex`, which avoids failures caused by stale shell lookup or dangling npm shims.
 
 Smoke-test the binary without starting a long-running session:
 
@@ -493,6 +510,8 @@ Revoke a compromised key in the user's KooyaHQ profile, remove it from CI/enviro
 ## Troubleshooting
 
 - `kooyahq: command not found` after a successful Linux/macOS install: run `hash -r`, then `kooyahq --version`.
+- Codex reports `No such file or directory (os error 2)`: reinstall the package, run `kooyahq mcp install --client codex`, then restart Codex and open a new thread. The prior entry or global npm shim is stale or dangling.
+- Codex reports `Tools: none` or startup incomplete: run `kooyahq mcp doctor --client codex`. `Auth: Unsupported` by itself is expected for this local stdio server because KooyaHQ uses its saved API credential profile rather than MCP OAuth.
 - `tsc: not found` during installation: fetch the current `main` and reinstall. Supported GitHub installs use committed `dist/` files and do not compile TypeScript.
 - SSH or repository error: verify `ssh -T git@github.com` and `git ls-remote git@github.com:KooyaPH/kooyahq_cli.git`.
 - `KooyaHQ is not configured`: run `kooyahq configure` or provide all three environment variables.
@@ -508,7 +527,7 @@ npm ci
 npm test
 npm run typecheck
 npm run build
-git diff --exit-code -- dist
+node scripts/verify-dist.mjs
 npm audit --omit=dev
 ```
 
