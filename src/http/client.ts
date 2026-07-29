@@ -175,6 +175,9 @@ function nodeNativeRequest(
       resolve(response);
     };
     const requestImplementation = url.protocol === 'http:' ? httpRequest : httpsRequest;
+    if (typeof body === 'string' && !headers.has('content-length')) {
+      headers.set('content-length', String(Buffer.byteLength(body)));
+    }
     const request = requestImplementation(buildHttpsRequestOptions(url, method, headers), (response) => {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
