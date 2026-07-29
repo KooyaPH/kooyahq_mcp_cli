@@ -13,6 +13,7 @@ import { configureCatalogEntries, configureHelpText } from './configure-docs.js'
 export function helpText(scope: string[] = []): string {
   const configuration = configureHelpText(scope);
   if (configuration) return configuration;
+  if (scope[0] === 'mcp') return mcpHelpText();
   if (scope.length > 0) {
     const name = scope.join(' ');
     const command = commandCatalog.find((candidate) => candidate.name === name);
@@ -40,6 +41,8 @@ Run \`kooyahq ${name} <command> --help\` for exact parameters, enums, constraint
 Usage:
   kooyahq configure
   kooyahq configure show|clear
+  kooyahq mcp install --client codex
+  kooyahq mcp doctor --client codex [--online]
   kooyahq <command> [arguments] [options]
   kooyahq --skill [group] [command] [--output markdown|json]
 
@@ -57,6 +60,19 @@ Global behavior:
   --help                 Show offline help without reading configuration.
 
 Authentication and authorization are enforced by the backend for every request. Mutations are never retried automatically.`;
+}
+
+function mcpHelpText(): string {
+  return `KooyaHQ Codex MCP setup
+
+Usage:
+  kooyahq mcp install --client codex
+  kooyahq mcp doctor --client codex
+  kooyahq mcp doctor --client codex --online
+
+Install registers an absolute local stdio command and installs the packaged kooyahq-cli skill.
+Doctor checks the package, Codex registration, local MCP handshake, exact tool list, and skill version.
+Use --online to also validate the configured KooyaHQ profile.`;
 }
 
 function commandHelp(command: CommandSpec): string {

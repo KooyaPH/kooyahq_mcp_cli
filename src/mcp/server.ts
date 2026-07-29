@@ -1,3 +1,5 @@
+import { TextDecoder } from 'node:util';
+import { once } from 'node:events';
 import type { Readable, Writable } from 'node:stream';
 
 import { publicErrorMessage } from '../core/errors.js';
@@ -29,13 +31,26 @@ interface JsonRpcError {
   };
 }
 
+interface McpLifecycle {
+  initializeAccepted: boolean;
+  initialized: boolean;
+}
+
 export interface McpServerStreams {
   input: Readable;
   output: Writable;
   error: Writable;
 }
 
-const DEFAULT_PROTOCOL_VERSION = '2025-06-18';
+export const SUPPORTED_MCP_PROTOCOL_VERSION = '2025-06-18';
+export const MAX_MCP_LINE_BYTES = 1024 * 1024;
+const OVERSIZED_RESPONSE_MESSAGE = `MCP response exceeds the ${MAX_MCP_LINE_BYTES}-byte line limit.`;
+const FALLBACK_ENVELOPE_BYTES = Buffer.byteLength(JSON.stringify({
+  jsonrpc: '2.0',
+  id: null,
+  error: { code: -32603, message: OVERSIZED_RESPONSE_MESSAGE },
+}), 'utf8') - Buffer.byteLength('null', 'utf8');
+const MAX_JSON_RPC_ID_BYTES = MAX_MCP_LINE_BYTES - FALLBACK_ENVELOPE_BYTES;
 
 export function runMcpServer(
   dependencies: McpBridgeDependencies,
@@ -45,28 +60,62 @@ export function runMcpServer(
     error: process.stderr,
   },
 ): void {
-  const parser = new McpFrameParser(async (message) => {
-    const response = await handleMcpMessage(message, dependencies);
-    if (!response) return;
-    streams.output.write(encodeFrame(response));
-  });
+  const lifecycle: McpLifecycle = { initializeAccepted: false, initialized: false };
+  const write = async (response: JsonRpcSuccess | JsonRpcError): Promise<void> => {
+    if (!streams.output.write(`${encodeBoundedResponse(response)}\n`)) {
+      await once(streams.output, 'drain');
+    }
+  };
+  const parser = new McpLineParser(
+    async (message) => {
+      const response = await handleMcpMessage(message, dependencies, lifecycle);
+      if (response) await write(response);
+    },
+    async () => write(failure(
+      null,
+      -32700,
+      'Parse error. Each MCP message must be one valid UTF-8 JSON line.',
+    )),
+  );
 
   streams.input.on('data', (chunk: Buffer | string) => {
-    parser.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    streams.input.pause();
+    void parser.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      .catch(() => streams.error.write('MCP processing error.\n'))
+      .finally(() => streams.input.resume());
   });
   streams.input.on('error', (error) => {
-    streams.error.write(`${error.message}\n`);
+    streams.error.write(`MCP input error: ${error.message}\n`);
   });
 }
 
 export async function handleMcpMessage(
   message: JsonRpcMessage,
   dependencies: McpBridgeDependencies,
+  lifecycle?: McpLifecycle,
 ): Promise<JsonRpcSuccess | JsonRpcError | undefined> {
+  const idIsAcceptable = acceptableId(message.id);
+  const id: JsonRpcId = idIsAcceptable && message.id !== undefined ? message.id : null;
+  if (!idIsAcceptable) return failure(null, -32600, 'Invalid JSON-RPC request id.');
+  if (message.jsonrpc !== '2.0' || typeof message.method !== 'string') {
+    return message.id === undefined ? undefined : failure(id, -32600, 'Invalid JSON-RPC request.');
+  }
+
+  if (message.method === 'notifications/initialized') {
+    if (lifecycle?.initializeAccepted) lifecycle.initialized = true;
+    return undefined;
+  }
   if (message.id === undefined) return undefined;
+  if (lifecycle && message.method !== 'initialize' && !lifecycle.initialized) {
+    return failure(message.id, -32002, 'MCP server is not initialized.');
+  }
+
   try {
-    return success(message.id, await routeMcpMessage(message, dependencies));
+    const result = await routeMcpMessage(message, dependencies);
+    if (lifecycle && message.method === 'initialize') lifecycle.initializeAccepted = true;
+    return success(message.id, result);
   } catch (error) {
+    if (error instanceof McpRequestError) return failure(message.id, error.code, error.message);
     return failure(message.id, -32000, publicErrorMessage(error));
   }
 }
@@ -77,11 +126,14 @@ async function routeMcpMessage(
 ): Promise<Record<string, unknown>> {
   if (message.method === 'initialize') {
     const params = recordOrEmpty(message.params);
-    const protocolVersion = typeof params.protocolVersion === 'string'
-      ? params.protocolVersion
-      : DEFAULT_PROTOCOL_VERSION;
+    if (params.protocolVersion !== SUPPORTED_MCP_PROTOCOL_VERSION) {
+      throw new McpRequestError(
+        -32602,
+        `Unsupported MCP protocol version. This server supports ${SUPPORTED_MCP_PROTOCOL_VERSION}.`,
+      );
+    }
     return {
-      protocolVersion,
+      protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
       capabilities: { tools: {} },
       serverInfo: {
         name: 'kooyahq-mcp',
@@ -96,7 +148,9 @@ async function routeMcpMessage(
 
   if (message.method === 'tools/call') {
     const params = recordOrEmpty(message.params);
-    if (typeof params.name !== 'string') throw new Error('tools/call requires params.name.');
+    if (typeof params.name !== 'string') {
+      throw new McpRequestError(-32602, 'tools/call requires params.name.');
+    }
     const result = await callMcpTool(params.name, params.arguments, dependencies);
     return {
       content: [{
@@ -107,7 +161,7 @@ async function routeMcpMessage(
     };
   }
 
-  throw new Error(`Unsupported MCP method ${message.method ?? '[missing]'}.`);
+  throw new McpRequestError(-32601, `Unsupported MCP method ${message.method ?? '[missing]'}.`);
 }
 
 function success(id: JsonRpcId, result: JsonRpcSuccess['result']): JsonRpcSuccess {
@@ -123,53 +177,94 @@ function recordOrEmpty(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function encodeFrame(message: JsonRpcSuccess | JsonRpcError): string {
-  const payload = JSON.stringify(message);
-  return `Content-Length: ${Buffer.byteLength(payload, 'utf8')}\r\n\r\n${payload}`;
+function acceptableId(value: unknown): value is JsonRpcId | undefined {
+  const validType = value === undefined || value === null || typeof value === 'string'
+    || (typeof value === 'number' && Number.isFinite(value));
+  if (!validType || value === undefined) return validType;
+  return Buffer.byteLength(JSON.stringify(value), 'utf8') <= MAX_JSON_RPC_ID_BYTES;
 }
 
-class McpFrameParser {
+function encodeBoundedResponse(response: JsonRpcSuccess | JsonRpcError): string {
+  const encoded = JSON.stringify(response);
+  if (Buffer.byteLength(encoded, 'utf8') <= MAX_MCP_LINE_BYTES) return encoded;
+
+  const correlatedFallback = JSON.stringify(failure(
+    response.id,
+    -32603,
+    OVERSIZED_RESPONSE_MESSAGE,
+  ));
+  if (Buffer.byteLength(correlatedFallback, 'utf8') <= MAX_MCP_LINE_BYTES) {
+    return correlatedFallback;
+  }
+
+  return JSON.stringify(failure(null, -32603, 'MCP response exceeded the line limit.'));
+}
+
+class McpRequestError extends Error {
+  constructor(readonly code: number, message: string) {
+    super(message);
+  }
+}
+
+class McpLineParser {
   private buffer = Buffer.alloc(0);
-  private draining = false;
+  private discardingOversizedLine = false;
+  private queue = Promise.resolve();
 
-  constructor(private readonly onMessage: (message: JsonRpcMessage) => Promise<void>) {}
+  constructor(
+    private readonly onMessage: (message: JsonRpcMessage) => Promise<void>,
+    private readonly onParseError: () => Promise<void>,
+  ) {}
 
-  push(chunk: Buffer): void {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    if (!this.draining) void this.drain();
-  }
-
-  private async drain(): Promise<void> {
-    this.draining = true;
-    try {
-      while (this.buffer.length > 0) {
-        const headerEnd = this.buffer.indexOf('\r\n\r\n');
-        if (headerEnd === -1) return;
-        const headers = this.buffer.subarray(0, headerEnd).toString('utf8');
-        const contentLength = contentLengthFrom(headers);
-        if (contentLength === undefined) {
-          this.buffer = Buffer.alloc(0);
-          return;
-        }
-        const bodyStart = headerEnd + 4;
-        const bodyEnd = bodyStart + contentLength;
-        if (this.buffer.length < bodyEnd) return;
-        const body = this.buffer.subarray(bodyStart, bodyEnd).toString('utf8');
-        this.buffer = this.buffer.subarray(bodyEnd);
-        await this.onMessage(JSON.parse(body) as JsonRpcMessage);
+  push(chunk: Buffer): Promise<void> {
+    let offset = 0;
+    while (offset < chunk.length) {
+      if (this.discardingOversizedLine) {
+        const newline = chunk.indexOf(0x0a, offset);
+        if (newline === -1) return this.queue;
+        this.discardingOversizedLine = false;
+        offset = newline + 1;
+        continue;
       }
-    } finally {
-      this.draining = false;
-    }
-  }
-}
 
-function contentLengthFrom(headers: string): number | undefined {
-  for (const line of headers.split('\r\n')) {
-    const [name, rawValue] = line.split(':', 2);
-    if (name?.toLocaleLowerCase() !== 'content-length') continue;
-    const value = Number(rawValue?.trim());
-    return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+      const newline = chunk.indexOf(0x0a, offset);
+      const end = newline === -1 ? chunk.length : newline;
+      const fragment = chunk.subarray(offset, end);
+      if (this.buffer.length + fragment.length > MAX_MCP_LINE_BYTES) {
+        this.buffer = Buffer.alloc(0);
+        this.enqueueParseError();
+        if (newline === -1) {
+          this.discardingOversizedLine = true;
+          return this.queue;
+        }
+      } else {
+        this.buffer = this.buffer.length === 0
+          ? Buffer.from(fragment)
+          : Buffer.concat([this.buffer, fragment]);
+        if (newline !== -1) this.enqueueLine(this.buffer);
+      }
+      if (newline === -1) return this.queue;
+      this.buffer = Buffer.alloc(0);
+      offset = newline + 1;
+    }
+    return this.queue;
   }
-  return undefined;
+
+  private enqueueLine(line: Buffer): void {
+    this.queue = this.queue.then(async () => {
+      try {
+        const normalized = line.at(-1) === 0x0d ? line.subarray(0, -1) : line;
+        const decoded = new TextDecoder('utf-8', { fatal: true }).decode(normalized);
+        const parsed = JSON.parse(decoded) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid');
+        await this.onMessage(parsed as JsonRpcMessage);
+      } catch {
+        await this.onParseError();
+      }
+    });
+  }
+
+  private enqueueParseError(): void {
+    this.queue = this.queue.then(async () => this.onParseError());
+  }
 }

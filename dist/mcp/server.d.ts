@@ -23,11 +23,17 @@ interface JsonRpcError {
         message: string;
     };
 }
+interface McpLifecycle {
+    initializeAccepted: boolean;
+    initialized: boolean;
+}
 export interface McpServerStreams {
     input: Readable;
     output: Writable;
     error: Writable;
 }
+export declare const SUPPORTED_MCP_PROTOCOL_VERSION = "2025-06-18";
+export declare const MAX_MCP_LINE_BYTES: number;
 export declare function runMcpServer(dependencies: McpBridgeDependencies, streams?: McpServerStreams): void;
-export declare function handleMcpMessage(message: JsonRpcMessage, dependencies: McpBridgeDependencies): Promise<JsonRpcSuccess | JsonRpcError | undefined>;
+export declare function handleMcpMessage(message: JsonRpcMessage, dependencies: McpBridgeDependencies, lifecycle?: McpLifecycle): Promise<JsonRpcSuccess | JsonRpcError | undefined>;
 export {};

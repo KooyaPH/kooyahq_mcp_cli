@@ -10,7 +10,7 @@ const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
 };
 const packageLock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
   version?: string;
-  packages?: Record<string, { version?: string }>;
+  packages?: Record<string, { version?: string; bin?: Record<string, string> }>;
 };
 
 const readme = readFileSync('README.md', 'utf8');
@@ -20,17 +20,61 @@ const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
   : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
-  assert.equal(packageJson.version, '0.2.0');
-  assert.equal(packageLock.version, '0.2.0');
-  assert.equal(packageLock.packages?.['']?.version, '0.2.0');
+  assert.equal(packageJson.version, '0.3.0');
+  assert.equal(packageLock.version, '0.3.0');
+  assert.equal(packageLock.packages?.['']?.version, '0.3.0');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
   assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
+  assert.equal(packageLock.packages?.['']?.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.ok(packageJson.files?.includes('dist'));
+  assert.ok(packageJson.files?.includes('docs'));
+  assert.ok(packageJson.files?.includes('skills'));
   assert.equal(packageJson.scripts?.prepare, 'node scripts/prepare-git-install.mjs');
   assert.doesNotMatch(packageJson.scripts?.prepare ?? '', /tsc|npm run build/);
   assert.ok(existsSync('dist/bin/kooyahq.js'));
   assert.ok(existsSync('dist/bin/kooyahq-mcp.js'));
   assert.ok(existsSync('scripts/prepare-git-install.mjs'));
+  const prepare = readFileSync('scripts/prepare-git-install.mjs', 'utf8');
+  for (const module of ['codex', 'index', 'process', 'skill', 'types']) {
+    assert.match(prepare, new RegExp(`dist/mcp/setup/${module}\\.js`));
+  }
+});
+
+test('package includes focused MCP manuals and the KooyaHQ Codex skill', () => {
+  for (const path of [
+    'docs/installation.md',
+    'docs/codex-mcp.md',
+    'docs/scenarios.md',
+    'skills/kooyahq-cli/SKILL.md',
+    'skills/kooyahq-cli/VERSION',
+  ]) {
+    assert.ok(existsSync(path), `${path} must be packaged`);
+  }
+
+  const skill = readFileSync('skills/kooyahq-cli/SKILL.md', 'utf8');
+  assert.equal(
+    readFileSync('skills/kooyahq-cli/VERSION', 'utf8').trim(),
+    packageJson.version,
+  );
+  assert.match(skill, /discover/i);
+  assert.match(skill, /exact selector/i);
+  assert.match(skill, /dry.?run/i);
+  assert.match(skill, /confirm:\s*true/i);
+  assert.match(skill, /verify.*clean.?up/is);
+  assert.match(skill, /project display name/i);
+  assert.match(skill, /Auth:\s*Unsupported/i);
+  assert.match(skill, /Tools:\s*none/i);
+});
+
+test('README documents deterministic Codex setup and startup recovery', () => {
+  assert.match(readme, /kooyahq mcp install --client codex/);
+  assert.match(readme, /kooyahq mcp doctor --client codex --online/);
+  assert.match(readme, /No such file or directory/);
+  assert.match(readme, /Tools:\s*none/i);
+  assert.match(readme, /dangling|stale.*shim/i);
+  assert.match(readme, /restart Codex.*new thread/i);
+  assert.match(readme, /CODEX_HOME.*skills[/\\]kooyahq-cli/is);
+  assert.match(readme, /remove.*kooyahq-cli skill/is);
 });
 
 test('README documents global GitHub install and configuration steps', () => {
@@ -74,7 +118,8 @@ test('README defines timer projects as display names rather than identifiers', (
 });
 
 test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () => {
-  assert.match(workflow, /git diff --exit-code -- dist/);
+  assert.match(workflow, /node scripts\/verify-dist\.mjs/);
+  assert.ok(existsSync('scripts/verify-dist.mjs'));
   assert.match(workflow, /ubuntu-latest/);
   assert.match(workflow, /macos-latest/);
   assert.match(workflow, /windows-latest/);
@@ -82,6 +127,7 @@ test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () 
   assert.match(workflow, /needs\.cross-platform-smoke\.result[\s\S]*skipped/);
   assert.match(workflow, /kooyahq\.js --skill/);
   assert.match(workflow, /kooyahq-mcp\.js/);
+  assert.match(workflow, /node scripts\/smoke-mcp\.mjs/);
   assert.match(workflow, /node scripts\/smoke-git-install\.mjs/);
   assert.match(gitInstallSmoke, /--global/);
   assert.match(gitInstallSmoke, /--install-links=true/);
