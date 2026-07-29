@@ -40,6 +40,39 @@ test('default transport supports an allowed HTTP localhost origin', async () => 
   }
 });
 
+test('native transport sends a JSON body on DELETE requests', async () => {
+  let receivedBody = '';
+  let receivedLength: string | undefined;
+  const server = createServer((request, response) => {
+    receivedLength = request.headers['content-length'];
+    request.setEncoding('utf8');
+    request.on('data', (chunk) => { receivedBody += chunk; });
+    request.on('end', () => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('{"ok":true}');
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    const client = new ApiClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+      version: '1.0.0',
+      retryDelayMs: 1,
+    });
+    const body = { url: 'https://example.com/café' };
+
+    assert.deepEqual(await client.request('DELETE', '/tickets/1/documents', { body }), { ok: true });
+    assert.equal(receivedBody, JSON.stringify(body));
+    assert.equal(receivedLength, String(Buffer.byteLength(JSON.stringify(body))));
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test('native transport destroys timed-out sockets and bounds GET retries', async () => {
   let requests = 0;
   const openSockets = new Set<Socket>();
