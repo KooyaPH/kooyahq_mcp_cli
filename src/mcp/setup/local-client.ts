@@ -157,32 +157,26 @@ export async function requireCommandRegistrationAbsent(
   );
 }
 
-export async function commandRegistrationCheck(
+export async function unverifiableCommandRegistrationCheck(
   dependencies: SetupDependencies,
   clientName: string,
   command: string,
   args: string[],
 ): Promise<DoctorCheck> {
   try {
-    const result = await dependencies.runCommand(command, args);
-    return result.status === 0
-      ? {
-        name: `${clientName} registration`,
-        ok: true,
-        message: `${clientName} reports a KooyaHQ MCP registration.`,
-      }
-      : {
-        name: `${clientName} registration`,
-        ok: false,
-        message: `${clientName} could not verify its KooyaHQ MCP registration.`,
-      };
+    await dependencies.runCommand(command, args);
+    return {
+      name: `${clientName} registration`,
+      ok: false,
+      message: `${clientName} cannot verify the exact KooyaHQ MCP registration from this command output.`,
+    };
   } catch (error) {
     return isMissingExecutable(error)
       ? { name: `${clientName} registration`, ok: false, message: `${clientName} CLI was not found.` }
       : {
         name: `${clientName} registration`,
         ok: false,
-        message: `${clientName} could not verify its KooyaHQ MCP registration.`,
+        message: `${clientName} cannot verify the exact KooyaHQ MCP registration from this command output.`,
       };
   }
 }

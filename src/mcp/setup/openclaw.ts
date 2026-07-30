@@ -1,43 +1,12 @@
-import {
-  commandRegistrationCheck,
-  localMcpHandshakeCheck,
-  localMcpTargetCheck,
-  onlineStatusCheck,
-  projectGateCheck,
-  requireCommandRegistrationAbsent,
-  requireLocalMcpDescriptor,
-} from './local-client.js';
-import type { DoctorReport, SetupDependencies } from './types.js';
+import type { LocalMcpDescriptor } from './local-client.js';
 
-const CLIENT_NAME = 'OpenClaw';
-
-export async function installOpenClawIntegration(dependencies: SetupDependencies): Promise<void> {
-  const descriptor = await requireLocalMcpDescriptor(dependencies);
-  await requireCommandRegistrationAbsent(
-    dependencies,
-    CLIENT_NAME,
-    dependencies.openclawCommand,
-    ['mcp', 'show', 'kooyahq'],
-    () => false,
-    `openclaw mcp add kooyahq --command ${descriptor.command} --arg ${descriptor.args[0]}`,
-  );
-}
-
-export async function doctorOpenClawIntegration(
-  dependencies: SetupDependencies,
-  online: boolean,
-): Promise<DoctorReport> {
-  const checks = [
-    await localMcpTargetCheck(dependencies),
-    await commandRegistrationCheck(
-      dependencies,
-      CLIENT_NAME,
-      dependencies.openclawCommand,
-      ['mcp', 'doctor', 'kooyahq', '--probe'],
-    ),
-    await localMcpHandshakeCheck(dependencies),
-    projectGateCheck(),
+export function openClawManualRegistrationMessages(descriptor: LocalMcpDescriptor): string[] {
+  return [
+    'OpenClaw requires manual registration because this CLI cannot safely verify its persisted descriptor.',
+    'From the operating system that owns OpenClaw, run this documented local stdio registration with literal shell quoting:',
+    '  openclaw mcp add kooyahq --command <node-executable> --arg <kooyahq-mcp-script>',
+    `  node-executable: ${JSON.stringify(descriptor.command)}`,
+    `  kooyahq-mcp-script: ${JSON.stringify(descriptor.args[0])}`,
+    'Then run: openclaw mcp doctor kooyahq --probe',
   ];
-  if (online) checks.push(await onlineStatusCheck(dependencies));
-  return { ok: checks.every((check) => check.ok), checks };
 }

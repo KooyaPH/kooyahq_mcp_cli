@@ -1,43 +1,14 @@
-import {
-  commandRegistrationCheck,
-  localMcpHandshakeCheck,
-  localMcpTargetCheck,
-  onlineStatusCheck,
-  projectGateCheck,
-  requireCommandRegistrationAbsent,
-  requireLocalMcpDescriptor,
-} from './local-client.js';
-import type { DoctorReport, SetupDependencies } from './types.js';
+import type { LocalMcpDescriptor } from './local-client.js';
 
-const CLIENT_NAME = 'Hermes';
-
-export async function installHermesIntegration(dependencies: SetupDependencies): Promise<void> {
-  const descriptor = await requireLocalMcpDescriptor(dependencies);
-  await requireCommandRegistrationAbsent(
-    dependencies,
-    CLIENT_NAME,
-    dependencies.hermesCommand,
-    ['mcp', 'test', 'kooyahq'],
-    () => false,
-    `hermes mcp add kooyahq --command ${descriptor.command} --args ${descriptor.args[0]}`,
-  );
-}
-
-export async function doctorHermesIntegration(
-  dependencies: SetupDependencies,
-  online: boolean,
-): Promise<DoctorReport> {
-  const checks = [
-    await localMcpTargetCheck(dependencies),
-    await commandRegistrationCheck(
-      dependencies,
-      CLIENT_NAME,
-      dependencies.hermesCommand,
-      ['mcp', 'test', 'kooyahq'],
-    ),
-    await localMcpHandshakeCheck(dependencies),
-    projectGateCheck(),
+export function hermesManualRegistrationMessages(descriptor: LocalMcpDescriptor): string[] {
+  return [
+    'Hermes requires manual registration because this CLI cannot safely verify its persisted descriptor.',
+    'Add this local stdio entry to ~/.hermes/config.yaml from the operating system that owns Hermes:',
+    'mcp_servers:',
+    '  kooyahq:',
+    `    command: ${JSON.stringify(descriptor.command)}`,
+    '    args:',
+    `      - ${JSON.stringify(descriptor.args[0])}`,
+    'Restart Hermes or reload its MCP configuration before using the tools.',
   ];
-  if (online) checks.push(await onlineStatusCheck(dependencies));
-  return { ok: checks.every((check) => check.ok), checks };
 }

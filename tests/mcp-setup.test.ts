@@ -137,7 +137,7 @@ test('JSON registration preserves other servers, uses the absolute descriptor, a
   assert.match(output.join('\n'), /MCP handshake/i);
 });
 
-test('Claude registers only after its exact absent signal; OpenClaw and Hermes fail closed while their state is unverifiable', async () => {
+test('Claude installs only after its exact absent signal and fails doctor when its registration descriptor is unverifiable', async () => {
   const fixture = await setupFixture();
   const output: string[] = [];
   const calls: Array<{ command: string; args: string[] }> = [];
@@ -153,27 +153,19 @@ test('Claude registers only after its exact absent signal; OpenClaw and Hermes f
       if (args.includes('add-json') || args.includes('add')) registered.add(command);
       if (args.includes('get')) {
         return registered.has(command)
-          ? { status: 0, stdout: '', stderr: '' }
+          ? { status: 0, stdout: 'kooyahq: configured', stderr: '' }
           : claudeMissingResult();
-      }
-      if (args.includes('show') || args.includes('doctor') || args.includes('test')) {
-        return { status: 1, stdout: '', stderr: '' };
       }
       return { status: 0, stdout: '', stderr: '' };
     },
+    probeMcp: async () => { throw new Error('Claude doctor must not use a direct handshake as registration proof.'); },
   });
   const script = join(fixture.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js');
 
   assert.equal(await runCli(['mcp', 'install', '--client', 'claude'], runtime), 0);
   output.length = 0;
-  assert.equal(await runCli(['mcp', 'install', '--client', 'openclaw'], runtime), 2);
-  assert.match(output.join('\n'), /OpenClaw.*manual registration/i);
-  output.length = 0;
-  assert.equal(await runCli(['mcp', 'install', '--client', 'hermes'], runtime), 2);
-  assert.match(output.join('\n'), /Hermes.*manual registration/i);
-  assert.equal(await runCli(['mcp', 'doctor', '--client', 'claude'], runtime), 0);
-  assert.equal(await runCli(['mcp', 'doctor', '--client', 'openclaw'], runtime), 2);
-  assert.equal(await runCli(['mcp', 'doctor', '--client', 'hermes'], runtime), 2);
+  assert.equal(await runCli(['mcp', 'doctor', '--client', 'claude'], runtime), 2);
+  assert.match(output.join('\n'), /Claude Code.*cannot verify.*exact.*registration/i);
 
   assert.deepEqual(calls, [
     { command: 'claude', args: ['mcp', 'get', 'kooyahq'] },
@@ -185,15 +177,45 @@ test('Claude registers only after its exact absent signal; OpenClaw and Hermes f
         args: [script],
       })],
     },
-    { command: 'openclaw', args: ['mcp', 'show', 'kooyahq'] },
-    { command: 'hermes', args: ['mcp', 'test', 'kooyahq'] },
     { command: 'claude', args: ['mcp', 'get', 'kooyahq'] },
-    { command: 'openclaw', args: ['mcp', 'doctor', 'kooyahq', '--probe'] },
-    { command: 'hermes', args: ['mcp', 'test', 'kooyahq'] },
   ]);
   assert.doesNotMatch(JSON.stringify(calls), new RegExp(`${accessKey}|${secret}`));
-  assert.match(output.join('\n'), /Claude Code/i);
-  assert.doesNotMatch(JSON.stringify(calls), /openclaw.*mcp","add|hermes.*mcp","add/);
+});
+
+test('OpenClaw and Hermes are manual-only and expose their local stdio descriptors without invoking client commands', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const runtime = runtimeDependencies(fixture, output, {}, {
+    runCommand: async (command, args) => {
+      calls.push({ command, args });
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  const script = join(fixture.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js');
+
+  assert.equal(await runCli(['mcp', 'install', '--client', 'openclaw'], runtime), 2);
+  assert.match(output.join('\n'), /OpenClaw.*manual registration.*mcp manual/i);
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'doctor', '--client', 'hermes'], runtime), 2);
+  assert.match(output.join('\n'), /Hermes.*manual registration.*mcp manual/i);
+
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'manual', '--client', 'openclaw'], runtime), 0);
+  assert.match(output.join('\n'), /openclaw mcp add kooyahq --command/i);
+  assert.match(output.join('\n'), new RegExp(fixture.dependencies.nodeExecutable.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+  assert.match(output.join('\n'), new RegExp(script.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+  assert.match(output.join('\n'), /openclaw mcp doctor kooyahq --probe/i);
+
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'manual', '--client', 'hermes'], runtime), 0);
+  assert.match(output.join('\n'), /mcp_servers:/i);
+  assert.match(output.join('\n'), /kooyahq:/i);
+  assert.match(output.join('\n'), /command:/i);
+  assert.match(output.join('\n'), /args:/i);
+  assert.match(output.join('\n'), new RegExp(script.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+
+  assert.deepEqual(calls, []);
 });
 
 test('command-managed installers refuse a registration that cannot be verified as absent', async () => {
@@ -231,22 +253,26 @@ test('local client setup reports missing client targets without writing a JSON r
   assert.match(output.join('\n'), /target is missing/i);
 });
 
-test('root and MCP help list every supported local client and reject other client names', async () => {
+test('root and MCP help distinguish automated clients from manual-only clients', async () => {
   const fixture = await setupFixture();
   const output: string[] = [];
   const runtime = runtimeDependencies(fixture, output);
-  const clients = ['codex', 'cursor', 'claude', 'gemini', 'antigravity', 'openclaw', 'hermes'];
+  const automatedClients = ['codex', 'cursor', 'claude', 'gemini', 'antigravity'];
 
   assert.equal(await runCli(['--help'], runtime), 0);
-  for (const client of clients) assert.match(output.join('\n'), new RegExp(client));
+  for (const client of automatedClients) assert.match(output.join('\n'), new RegExp(client));
+  assert.match(output.join('\n'), /mcp manual --client <openclaw\|hermes>/i);
 
   output.length = 0;
   assert.equal(await runCli(['mcp', '--help'], runtime), 0);
-  for (const client of clients) assert.match(output.join('\n'), new RegExp(client));
+  for (const client of automatedClients) assert.match(output.join('\n'), new RegExp(client));
+  assert.match(output.join('\n'), /manual-only clients:/i);
+  assert.match(output.join('\n'), /openclaw.*manual/i);
+  assert.match(output.join('\n'), /hermes.*manual/i);
 
   output.length = 0;
   assert.equal(await runCli(['mcp', 'install', '--client', 'unknown'], runtime), 2);
-  assert.match(output.join('\n'), /codex\|cursor\|claude\|gemini\|antigravity\|openclaw\|hermes/);
+  assert.match(output.join('\n'), /codex\|cursor\|claude\|gemini\|antigravity/);
 });
 
 test('Codex installer uses absolute MCP targets, preserves other skills, and is idempotent', async () => {
@@ -727,8 +753,6 @@ async function setupFixture(): Promise<{
       codexRoot: join(home, '.codex'),
       codexCommand: 'codex',
       claudeCommand: 'claude',
-      openclawCommand: 'openclaw',
-      hermesCommand: 'hermes',
       platform: 'linux',
       packageRoot,
       version: '0.3.0',

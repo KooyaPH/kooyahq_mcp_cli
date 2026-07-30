@@ -25,17 +25,15 @@ export type McpClient =
   | 'cursor'
   | 'claude'
   | 'gemini'
-  | 'antigravity'
-  | 'openclaw'
-  | 'hermes';
+  | 'antigravity';
+
+export type ManualMcpClient = 'openclaw' | 'hermes';
 
 export interface SetupDependencies {
   homeDirectory: string;
   codexRoot: string;
   codexCommand: string;
   claudeCommand: string;
-  openclawCommand: string;
-  hermesCommand: string;
   platform: NodeJS.Platform;
   packageRoot: string;
   version: string;

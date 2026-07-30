@@ -1,12 +1,11 @@
 import {
-  commandRegistrationCheck,
-  localMcpHandshakeCheck,
   localMcpTargetCheck,
   onlineStatusCheck,
   projectGateCheck,
   requireCommandRegistrationAbsent,
   requireLocalMcpDescriptor,
   runRegistrationCommand,
+  unverifiableCommandRegistrationCheck,
 } from './local-client.js';
 import type { DoctorReport, SetupDependencies } from './types.js';
 
@@ -36,13 +35,12 @@ export async function doctorClaudeIntegration(
 ): Promise<DoctorReport> {
   const checks = [
     await localMcpTargetCheck(dependencies),
-    await commandRegistrationCheck(
+    await unverifiableCommandRegistrationCheck(
       dependencies,
       CLIENT_NAME,
       dependencies.claudeCommand,
       ['mcp', 'get', 'kooyahq'],
     ),
-    await localMcpHandshakeCheck(dependencies),
     projectGateCheck(),
   ];
   if (online) checks.push(await onlineStatusCheck(dependencies));

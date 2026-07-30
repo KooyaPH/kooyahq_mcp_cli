@@ -7,18 +7,21 @@ import { doctorClaudeIntegration, installClaudeIntegration } from './claude.js';
 import { doctorCodexIntegration, installCodexIntegration } from './codex.js';
 import { doctorCursorIntegration, installCursorIntegration } from './cursor.js';
 import { doctorGeminiIntegration, installGeminiIntegration } from './gemini.js';
-import { doctorHermesIntegration, installHermesIntegration } from './hermes.js';
-import { doctorOpenClawIntegration, installOpenClawIntegration } from './openclaw.js';
+import { manualRegistrationMessages } from './manual.js';
 import { clientExecutable, codexExecutable, probeMcp, runCommand } from './process.js';
-import type { DoctorReport, McpClient, SetupDependencies, SetupOverrides } from './types.js';
+import type {
+  DoctorReport,
+  ManualMcpClient,
+  McpClient,
+  SetupDependencies,
+  SetupOverrides,
+} from './types.js';
 
 export { doctorAntigravityIntegration, installAntigravityIntegration } from './antigravity.js';
 export { doctorClaudeIntegration, installClaudeIntegration } from './claude.js';
 export { doctorCodexIntegration, installCodexIntegration } from './codex.js';
 export { doctorCursorIntegration, installCursorIntegration } from './cursor.js';
 export { doctorGeminiIntegration, installGeminiIntegration } from './gemini.js';
-export { doctorHermesIntegration, installHermesIntegration } from './hermes.js';
-export { doctorOpenClawIntegration, installOpenClawIntegration } from './openclaw.js';
 export type { McpClient, SetupDependencies, SetupOverrides } from './types.js';
 
 interface SetupContext {
@@ -41,7 +44,17 @@ export async function runMcpSetupCommand(
   context: SetupContext,
 ): Promise<SetupCommandResult> {
   const parsed = parseSetupCommand(argv);
-  const dependencies = setupDependencies(context, parsed.client);
+  const dependencies = setupDependencies(
+    context,
+    parsed.action === 'manual' ? undefined : parsed.client,
+  );
+  if (parsed.action === 'manual') {
+    return {
+      exitCode: 0,
+      stdout: await manualRegistrationMessages(parsed.client, dependencies),
+      stderr: [],
+    };
+  }
   const integration = clientIntegrations[parsed.client];
   if (parsed.action === 'install') {
     await integration.install(dependencies);
@@ -56,7 +69,7 @@ export async function runMcpSetupCommand(
   return formatDoctorReport(report);
 }
 
-function setupDependencies(context: SetupContext, client: McpClient): SetupDependencies {
+function setupDependencies(context: SetupContext, client?: McpClient): SetupDependencies {
   const packageRoot = context.overrides?.packageRoot
     ?? resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
   const nodeExecutable = context.overrides?.nodeExecutable ?? process.execPath;
@@ -75,8 +88,6 @@ function setupDependencies(context: SetupContext, client: McpClient): SetupDepen
     codexRoot,
     codexCommand: codexExecutable(context.platform),
     claudeCommand: clientExecutable(context.platform, 'claude'),
-    openclawCommand: clientExecutable(context.platform, 'openclaw'),
-    hermesCommand: clientExecutable(context.platform, 'hermes'),
     platform: context.platform,
     packageRoot,
     version: context.version,
@@ -93,10 +104,14 @@ function parseSetupCommand(argv: string[]): {
   action: 'install' | 'doctor';
   client: McpClient;
   online: boolean;
+} | {
+  action: 'manual';
+  client: ManualMcpClient;
+  online: false;
 } {
   const action = argv[0];
-  if (action !== 'install' && action !== 'doctor') {
-    throw new ValidationError(`Usage: kooyahq mcp install|doctor --client ${mcpClientList()} [--online]`);
+  if (action !== 'install' && action !== 'doctor' && action !== 'manual') {
+    throw new ValidationError(`Usage: kooyahq mcp install|doctor --client ${mcpClientList()} [--online], or kooyahq mcp manual --client ${manualMcpClientList()}.`);
   }
   let client: string | undefined;
   let online = false;
@@ -110,6 +125,20 @@ function parseSetupCommand(argv: string[]): {
     } else {
       throw new ValidationError(`Unknown MCP setup option ${token ?? ''}.`);
     }
+  }
+  if (action === 'manual') {
+    if (!isManualMcpClient(client)) {
+      throw new ValidationError(`Manual MCP guidance supports --client ${manualMcpClientList()}.`);
+    }
+    if (online) {
+      throw new ValidationError('--online is supported only by kooyahq mcp doctor.');
+    }
+    return { action, client, online: false };
+  }
+  if (isManualMcpClient(client)) {
+    throw new ValidationError(
+      `${manualClientName(client)} supports manual registration only. Run kooyahq mcp manual --client ${client}.`,
+    );
   }
   if (!isMcpClient(client)) {
     throw new ValidationError(`MCP setup supports --client ${mcpClientList()}.`);
@@ -131,8 +160,6 @@ const clientIntegrations: Record<McpClient, ClientIntegration> = {
   claude: { install: installClaudeIntegration, doctor: doctorClaudeIntegration },
   gemini: { install: installGeminiIntegration, doctor: doctorGeminiIntegration },
   antigravity: { install: installAntigravityIntegration, doctor: doctorAntigravityIntegration },
-  openclaw: { install: installOpenClawIntegration, doctor: doctorOpenClawIntegration },
-  hermes: { install: installHermesIntegration, doctor: doctorHermesIntegration },
 };
 
 const installationMessages: Record<McpClient, string[]> = {
@@ -156,14 +183,6 @@ const installationMessages: Record<McpClient, string[]> = {
     'KooyaHQ MCP is installed for Google Antigravity.',
     'Restart Google Antigravity before opening a new MCP-enabled session.',
   ],
-  openclaw: [
-    'KooyaHQ MCP is installed for OpenClaw.',
-    'Restart OpenClaw before opening a new MCP-enabled session.',
-  ],
-  hermes: [
-    'KooyaHQ MCP is installed for Hermes.',
-    'Restart Hermes before opening a new MCP-enabled session.',
-  ],
 };
 
 function isMcpClient(value: string | undefined): value is McpClient {
@@ -171,13 +190,23 @@ function isMcpClient(value: string | undefined): value is McpClient {
     || value === 'cursor'
     || value === 'claude'
     || value === 'gemini'
-    || value === 'antigravity'
-    || value === 'openclaw'
-    || value === 'hermes';
+    || value === 'antigravity';
 }
 
 function mcpClientList(): string {
-  return 'codex|cursor|claude|gemini|antigravity|openclaw|hermes';
+  return 'codex|cursor|claude|gemini|antigravity';
+}
+
+function isManualMcpClient(value: string | undefined): value is ManualMcpClient {
+  return value === 'openclaw' || value === 'hermes';
+}
+
+function manualMcpClientList(): string {
+  return 'openclaw|hermes';
+}
+
+function manualClientName(client: ManualMcpClient): string {
+  return client === 'openclaw' ? 'OpenClaw' : 'Hermes';
 }
 
 function formatDoctorReport(report: DoctorReport): SetupCommandResult {

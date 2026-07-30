@@ -41,8 +41,9 @@ Run \`kooyahq ${name} <command> --help\` for exact parameters, enums, constraint
 Usage:
   kooyahq configure
   kooyahq configure show|clear
-  kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes>
-  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes> [--online]
+  kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity>
+  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity> [--online]
+  kooyahq mcp manual --client <openclaw|hermes>
   kooyahq <command> [arguments] [options]
   kooyahq --skill [group] [command] [--output markdown|json]
 
@@ -66,9 +67,10 @@ function mcpHelpText(): string {
   return `KooyaHQ local MCP setup
 
 Usage:
-  kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes>
-  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes>
-  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes> --online
+  kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity>
+  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity>
+  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity> --online
+  kooyahq mcp manual --client <openclaw|hermes>
 
 Supported clients:
   codex        Codex, including the packaged kooyahq-cli skill
@@ -76,11 +78,13 @@ Supported clients:
   claude       Claude Code
   gemini       Gemini CLI
   antigravity  Google Antigravity
-  openclaw     OpenClaw
-  hermes       Hermes
+Manual-only clients:
+  openclaw     OpenClaw (manual registration; no automated install or doctor)
+  hermes       Hermes (manual registration; no automated install or doctor)
 
 Install registers an absolute local stdio command. Codex also installs the packaged kooyahq-cli skill.
-Doctor checks the package, client registration, and local MCP handshake; Codex additionally checks its skill version.
+Doctor checks the package, client registration, and local MCP handshake; Codex additionally checks its skill version. Claude Code cannot expose its registration as a stable structured descriptor, so its doctor fails closed instead of treating a generic lookup as proof.
+Use manual for OpenClaw or Hermes to print their client-specific local stdio registration values without modifying client configuration.
 Run the command from the operating system that owns the client: a Windows Cursor desktop uses Windows paths, while WSL configures WSL-local clients.
 Use --online to also validate the configured KooyaHQ profile.`;
 }
