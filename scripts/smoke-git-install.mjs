@@ -21,13 +21,22 @@ const mcpExecutable = process.platform === 'win32'
   : join(prefix, 'bin', 'kooyahq-mcp');
 
 try {
-  execFileSync(npm, [
+  const installArgs = [
     'install',
     '--global',
     `--prefix=${prefix}`,
     '--install-links=true',
+    '--ignore-scripts',
     dependency,
-  ], { cwd: repository, stdio: 'inherit' });
+  ];
+  // npm's Git-dependency preparation cannot replace its own global target reliably.
+  // Model the documented upgrade path: remove the old package, then install the exact revision.
+  execFileSync(npm, installArgs, { cwd: repository, stdio: 'inherit' });
+  execFileSync(npm, ['uninstall', '--global', `--prefix=${prefix}`, 'kooyahq-cli'], {
+    cwd: repository,
+    stdio: 'inherit',
+  });
+  execFileSync(npm, installArgs, { cwd: repository, stdio: 'inherit' });
   execFileSync(executable, ['--version'], { stdio: 'inherit' });
   execFileSync(executable, ['--help'], { stdio: 'ignore' });
   execFileSync(executable, [

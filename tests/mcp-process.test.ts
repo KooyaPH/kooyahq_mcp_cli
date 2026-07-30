@@ -6,6 +6,8 @@ import test from 'node:test';
 
 import { probeMcp, runCommandWithLimits } from '../src/mcp/setup/process.js';
 
+const CHILD_PROCESS_STARTUP_TIMEOUT_MS = 10_000;
+
 test('setup command removes KooyaHQ credentials from child environment', async () => {
   const result = await runCommandWithLimits(process.execPath, [
     '-e',
@@ -15,7 +17,7 @@ test('setup command removes KooyaHQ credentials from child environment', async (
     KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
     KEEP_ME: 'yes',
     CODEX_HOME: '/tmp/codex-test-home',
-  }, { timeoutMs: 2_000, maxOutputBytes: 1024, killGraceMs: 50 });
+  }, { timeoutMs: CHILD_PROCESS_STARTUP_TIMEOUT_MS, maxOutputBytes: 1024, killGraceMs: 50 });
   assert.deepEqual(JSON.parse(result.stdout), {
     keep: 'yes',
     codexHome: '/tmp/codex-test-home',

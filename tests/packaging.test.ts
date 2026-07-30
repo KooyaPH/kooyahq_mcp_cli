@@ -21,17 +21,17 @@ const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
   : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
-  assert.equal(packageJson.version, '0.4.0');
-  assert.equal(packageLock.version, '0.4.0');
-  assert.equal(packageLock.packages?.['']?.version, '0.4.0');
+  assert.equal(packageJson.version, '0.4.1');
+  assert.equal(packageLock.version, '0.4.1');
+  assert.equal(packageLock.packages?.['']?.version, '0.4.1');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
   assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.equal(packageLock.packages?.['']?.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.ok(packageJson.files?.includes('dist'));
   assert.ok(packageJson.files?.includes('docs'));
   assert.ok(packageJson.files?.includes('skills'));
-  assert.equal(packageJson.scripts?.prepare, 'node scripts/prepare-git-install.mjs');
-  assert.doesNotMatch(packageJson.scripts?.prepare ?? '', /tsc|npm run build/);
+  assert.equal(packageJson.scripts?.prepare, undefined);
+  assert.equal(packageJson.scripts?.prepack, undefined);
   assert.ok(existsSync('dist/bin/kooyahq.js'));
   assert.ok(existsSync('dist/bin/kooyahq-mcp.js'));
   assert.ok(existsSync('scripts/prepare-git-install.mjs'));
@@ -83,7 +83,7 @@ test('README documents deterministic Codex setup and startup recovery', () => {
 });
 
 test('README documents global GitHub install and configuration steps', () => {
-  assert.match(readme, /npm install -g --install-links=true git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
+  assert.match(readme, /npm install -g --install-links=true --ignore-scripts git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
   assert.match(readme, /npm uninstall -g kooyahq-cli/);
   assert.match(readme, /hash -r/);
   assert.match(readme, /tsc: not found/);
@@ -120,7 +120,8 @@ test('installation guides cover CLI and Codex MCP setup on Linux, macOS, and Win
     assert.match(guide, /## Linux/);
     assert.match(guide, /## macOS/);
     assert.match(guide, /## Windows/);
-    assert.match(guide, /npm install -g --install-links=true git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
+    assert.match(guide, /## Update/);
+    assert.match(guide, /npm install -g --install-links=true --ignore-scripts git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
     assert.match(guide, /kooyahq configure/);
     assert.match(guide, /kooyahq auth whoami --output json/);
     assert.match(guide, /kooyahq mcp install --client codex/);
@@ -202,7 +203,10 @@ test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () 
   assert.match(workflow, /kooyahq-mcp\.js/);
   assert.match(workflow, /node scripts\/smoke-mcp\.mjs/);
   assert.match(workflow, /node scripts\/smoke-git-install\.mjs/);
+  assert.equal((workflow.match(/node scripts\/smoke-git-install\.mjs/g) ?? []).length, 2);
   assert.match(gitInstallSmoke, /--global/);
   assert.match(gitInstallSmoke, /--install-links=true/);
+  assert.match(gitInstallSmoke, /--ignore-scripts/);
+  assert.match(gitInstallSmoke, /uninstall/);
   assert.match(gitInstallSmoke, /git\+file:/);
 });

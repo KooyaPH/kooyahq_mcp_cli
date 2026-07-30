@@ -69,7 +69,7 @@ kooyahq time timers start --project "Project Alpha" --task "Release review"
 If Codex reports `No such file or directory`, `Tools: none`, or startup incomplete:
 
 ```sh
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 hash -r
 kooyahq mcp install --client codex
 kooyahq mcp doctor --client codex

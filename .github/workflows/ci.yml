@@ -47,6 +47,9 @@ jobs:
       - name: Verify committed distribution
         run: node scripts/verify-dist.mjs
 
+      - name: Verify Git installation assets
+        run: node scripts/prepare-git-install.mjs
+
       - name: Audit production dependencies
         run: npm audit --omit=dev
 
@@ -64,6 +67,10 @@ jobs:
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --help
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq-mcp" --version
           "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq-mcp" --help
+
+      - name: Smoke-test repeat local Git global installation
+        if: matrix.node == 22
+        run: node scripts/smoke-git-install.mjs
 
   cross-platform-smoke:
     name: ${{ matrix.os }} / Node 18

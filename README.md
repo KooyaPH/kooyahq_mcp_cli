@@ -23,7 +23,7 @@ git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 ## Linux
 
 ```sh
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 hash -r
 kooyahq --version
 kooyahq --help
@@ -35,7 +35,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 hash -r
 kooyahq --version
 kooyahq --help
@@ -49,13 +49,24 @@ Install Node.js 18 or newer and Git for Windows, then run this in PowerShell:
 ```powershell
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
 ```
 
-The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout.
+The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout; `--ignore-scripts` avoids npm Git-dependency lifecycle recursion during an upgrade.
+
+## Update
+
+For a Git-based global upgrade, remove the current package before installing the new revision. This avoids npm's unreliable in-place replacement of a Git dependency:
+
+```sh
+npm uninstall -g kooyahq-cli
+npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+hash -r
+kooyahq --version
+```
 
 ## Remove
 

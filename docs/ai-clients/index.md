@@ -7,7 +7,7 @@ Install and configure the KooyaHQ CLI first. The local MCP server is a stdio pro
 On Linux, macOS, or Windows, install Node.js 18 or newer, Git, and the private CLI package. Then configure and verify the local profile:
 
 ```sh
-npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq configure
 kooyahq auth whoami --output json
 ```

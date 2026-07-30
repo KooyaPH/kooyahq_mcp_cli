@@ -1,6 +1,6 @@
 {
   "name": "kooyahq-cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Internal command-line client for KooyaHQ",
   "license": "UNLICENSED",
   "author": "KooyaHQ Engineering",
@@ -24,7 +24,6 @@
     "node": ">=18"
   },
   "scripts": {
-    "prepare": "node scripts/prepare-git-install.mjs",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/run-tests.mjs"
