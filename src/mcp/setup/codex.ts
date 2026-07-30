@@ -3,6 +3,7 @@ import { isAbsolute, join } from 'node:path';
 
 import { ConfigError } from '../../core/errors.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from '../server.js';
+import { localMcpDescriptor } from './local-client.js';
 import { commandRequiresShell, windowsShellArgumentsAreSafe } from './process.js';
 import { installSkill } from './skill.js';
 import type { DoctorCheck, DoctorReport, SetupDependencies } from './types.js';
@@ -116,7 +117,7 @@ export async function doctorCodexIntegration(
 }
 
 function mcpScriptPath(dependencies: SetupDependencies): string {
-  return join(dependencies.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js');
+  return localMcpDescriptor(dependencies).args[0];
 }
 
 async function requireInstallTargets(nodeExecutable: string, scriptPath: string): Promise<void> {

@@ -41,8 +41,8 @@ Run \`kooyahq ${name} <command> --help\` for exact parameters, enums, constraint
 Usage:
   kooyahq configure
   kooyahq configure show|clear
-  kooyahq mcp install --client codex
-  kooyahq mcp doctor --client codex [--online]
+  kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes>
+  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes> [--online]
   kooyahq <command> [arguments] [options]
   kooyahq --skill [group] [command] [--output markdown|json]
 
@@ -63,15 +63,25 @@ Authentication and authorization are enforced by the backend for every request. 
 }
 
 function mcpHelpText(): string {
-  return `KooyaHQ Codex MCP setup
+  return `KooyaHQ local MCP setup
 
 Usage:
-  kooyahq mcp install --client codex
-  kooyahq mcp doctor --client codex
-  kooyahq mcp doctor --client codex --online
+  kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes>
+  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes>
+  kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity|openclaw|hermes> --online
 
-Install registers an absolute local stdio command and installs the packaged kooyahq-cli skill.
-Doctor checks the package, Codex registration, local MCP handshake, exact tool list, and skill version.
+Supported clients:
+  codex        Codex, including the packaged kooyahq-cli skill
+  cursor       Cursor on this operating system
+  claude       Claude Code
+  gemini       Gemini CLI
+  antigravity  Google Antigravity
+  openclaw     OpenClaw
+  hermes       Hermes
+
+Install registers an absolute local stdio command. Codex also installs the packaged kooyahq-cli skill.
+Doctor checks the package, client registration, and local MCP handshake; Codex additionally checks its skill version.
+Run the command from the operating system that owns the client: a Windows Cursor desktop uses Windows paths, while WSL configures WSL-local clients.
 Use --online to also validate the configured KooyaHQ profile.`;
 }
 

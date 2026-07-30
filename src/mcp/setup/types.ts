@@ -20,10 +20,22 @@ export interface DoctorReport {
   checks: DoctorCheck[];
 }
 
+export type McpClient =
+  | 'codex'
+  | 'cursor'
+  | 'claude'
+  | 'gemini'
+  | 'antigravity'
+  | 'openclaw'
+  | 'hermes';
+
 export interface SetupDependencies {
   homeDirectory: string;
   codexRoot: string;
   codexCommand: string;
+  claudeCommand: string;
+  openclawCommand: string;
+  hermesCommand: string;
   platform: NodeJS.Platform;
   packageRoot: string;
   version: string;
