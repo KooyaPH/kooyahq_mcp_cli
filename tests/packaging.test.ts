@@ -21,9 +21,9 @@ const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
   : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
-  assert.equal(packageJson.version, '0.3.1');
-  assert.equal(packageLock.version, '0.3.1');
-  assert.equal(packageLock.packages?.['']?.version, '0.3.1');
+  assert.equal(packageJson.version, '0.4.0');
+  assert.equal(packageLock.version, '0.4.0');
+  assert.equal(packageLock.packages?.['']?.version, '0.4.0');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
   assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.equal(packageLock.packages?.['']?.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
@@ -36,7 +36,10 @@ test('GitHub installs use committed dist files without compiling TypeScript', ()
   assert.ok(existsSync('dist/bin/kooyahq-mcp.js'));
   assert.ok(existsSync('scripts/prepare-git-install.mjs'));
   const prepare = readFileSync('scripts/prepare-git-install.mjs', 'utf8');
-  for (const module of ['codex', 'index', 'process', 'skill', 'types']) {
+  for (const module of [
+    'antigravity', 'claude', 'codex', 'cursor', 'gemini', 'hermes', 'index',
+    'json-config', 'local-client', 'manual', 'openclaw', 'process', 'skill', 'types',
+  ]) {
     assert.match(prepare, new RegExp(`dist/mcp/setup/${module}\\.js`));
   }
 });
@@ -70,6 +73,7 @@ test('package includes focused MCP manuals and the KooyaHQ Codex skill', () => {
 test('README documents deterministic Codex setup and startup recovery', () => {
   assert.match(readme, /kooyahq mcp install --client codex/);
   assert.match(readme, /kooyahq mcp doctor --client codex --online/);
+  assert.doesNotMatch(readme, /"command": "kooyahq-mcp"/);
   assert.match(readme, /No such file or directory/);
   assert.match(readme, /Tools:\s*none/i);
   assert.match(readme, /dangling|stale.*shim/i);
@@ -123,6 +127,60 @@ test('installation guides cover CLI and Codex MCP setup on Linux, macOS, and Win
     assert.match(guide, /kooyahq mcp doctor --client codex --online/);
     assert.match(guide, /restart Codex.*new thread/i);
   }
+});
+
+test('AI client tutorials distinguish supported local setup from remote-only products', () => {
+  const clientGuide = readFileSync('docs/ai-clients/index.md', 'utf8');
+  assert.match(readme, /## AI client tutorials/);
+  assert.match(readme, /kooyahq mcp install --client cursor/);
+  assert.match(readme, /ChatGPT.*remote gateway required/is);
+  assert.match(readme, /Replit.*remote gateway required/is);
+  for (const client of ['Cursor', 'Claude Code', 'Gemini CLI', 'Google Antigravity', 'OpenClaw', 'Hermes Agent']) {
+    assert.match(clientGuide, new RegExp(`## ${client}`));
+  }
+  assert.match(clientGuide, /cursor-agent mcp list/);
+  assert.match(clientGuide, /kooyahq mcp install --client claude/);
+  assert.match(clientGuide, /mcpServers/);
+  assert.match(clientGuide, /projects list/);
+  assert.match(clientGuide, /confirm.*dryRun/is);
+  assert.match(clientGuide, /ChatGPT.*remote gateway required/is);
+  assert.match(clientGuide, /Replit.*remote gateway required/is);
+});
+
+test('each local MCP client tutorial distinguishes verified installation from manual registration', () => {
+  const automaticClients = [
+    ['cursor', 'Cursor'],
+    ['claude', 'Claude Code'],
+    ['gemini', 'Gemini CLI'],
+    ['antigravity', 'Google Antigravity'],
+  ] as const;
+  for (const [slug, title] of automaticClients) {
+    const guide = readFileSync(`docs/ai-clients/${slug}.md`, 'utf8');
+    assert.match(guide, new RegExp(`^# KooyaHQ MCP for ${title}`, 'm'));
+    assert.match(guide, /## Install/);
+    assert.match(guide, /## Verify/);
+    assert.match(guide, /## Use safely/);
+    assert.match(guide, /## Troubleshooting and recovery/);
+    assert.match(guide, new RegExp(`kooyahq mcp install --client ${slug}`));
+  }
+  for (const [slug, title] of [
+    ['openclaw', 'OpenClaw'],
+    ['hermes', 'Hermes Agent'],
+  ] as const) {
+    const guide = readFileSync(`docs/ai-clients/${slug}.md`, 'utf8');
+    assert.match(guide, new RegExp(`^# KooyaHQ MCP for ${title}`, 'm'));
+    assert.match(guide, /## Install/);
+    assert.match(guide, /## Verify/);
+    assert.match(guide, /## Use safely/);
+    assert.match(guide, /## Troubleshooting and recovery/);
+    assert.match(guide, new RegExp(`kooyahq mcp manual --client ${slug}`));
+    assert.match(guide, /registration.*manual/i);
+    assert.doesNotMatch(guide, new RegExp(`kooyahq mcp install --client ${slug}`));
+  }
+  const webGuide = readFileSync('docs/ai-clients/web-and-remote.md', 'utf8');
+  assert.match(webGuide, /^# Hosted and web AI clients/m);
+  assert.match(webGuide, /remote gateway required/i);
+  assert.match(webGuide, /no.*chatgpt.*installer/i);
 });
 
 test('README defines timer projects as display names rather than identifiers', () => {

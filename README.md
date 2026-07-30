@@ -115,6 +115,24 @@ kooyahq mcp doctor --client codex --online
 
 Restart Codex and open a new thread. The installer writes absolute local targets, registers the MCP server, and installs the `kooyahq-cli` skill; an already-running Codex thread will not reload either automatically.
 
+## AI client tutorials
+
+The local MCP server runs only on the same computer as the client. This is the supported matrix:
+
+| Client | Setup | Verification |
+| --- | --- | --- |
+| Codex | `kooyahq mcp install --client codex` | `kooyahq mcp doctor --client codex --online` |
+| Cursor desktop or Cursor Agent | `kooyahq mcp install --client cursor` on that client's OS | `kooyahq mcp doctor --client cursor --online`; Cursor Agent also supports `cursor-agent mcp list` |
+| Claude Code | `kooyahq mcp install --client claude` | `claude mcp get kooyahq` (the CLI doctor fails closed because this query is text-only) |
+| Gemini CLI | `kooyahq mcp install --client gemini` | `kooyahq mcp doctor --client gemini --online` |
+| Google Antigravity | `kooyahq mcp install --client antigravity` | `kooyahq mcp doctor --client antigravity --online` |
+| OpenClaw | `kooyahq mcp manual --client openclaw` | `openclaw mcp doctor kooyahq --probe` after reviewed manual registration |
+| Hermes Agent | `kooyahq mcp manual --client hermes` | `hermes mcp test kooyahq` after reviewed manual registration |
+
+The complete Linux, macOS, and Windows tutorial, configuration locations, recovery steps, and a safe read/mutation scenario are in [AI client tutorials](docs/ai-clients/index.md).
+
+ChatGPT and Replit are browser/hosted products: **remote gateway required**. They cannot start the local stdio process and are not installed by this CLI. The same boundary applies to Gemini web/API and Claude.ai connectors. A production remote gateway must provide HTTPS, per-user authentication, backend-enforced project validation, approvals, audit logs, rate limits, health checks, and credential revocation before any web installation is documented.
+
 ## Offline help and agent discovery
 
 Help and skill discovery run before configuration and never send network traffic:
@@ -150,19 +168,7 @@ kooyahq mcp doctor --client codex --online
 
 The installer registers absolute Node.js and server-script paths and installs the packaged `kooyahq-cli` skill without changing an existing `kooyahq-workflow` skill. Restart Codex and open a new thread after installation so it reloads the MCP server and skills. The default doctor is offline; `--online` additionally checks the authenticated KooyaHQ profile without printing credentials.
 
-Typical MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "kooyahq": {
-      "command": "kooyahq-mcp"
-    }
-  }
-}
-```
-
-The JSON above illustrates the transport shape for other clients. Codex users should use `kooyahq mcp install --client codex`, which avoids failures caused by stale shell lookup or dangling npm shims.
+Do not copy a generic MCP entry that invokes the bare `kooyahq-mcp` command: shell lookup and npm shims can become stale. Use `kooyahq mcp install --client <client>` for supported automatic clients; it writes the exact absolute Node.js and server-script descriptor. For manual-only clients, run `kooyahq mcp manual --client <client>` and enter the emitted absolute descriptor after reviewing it.
 
 Smoke-test the binary without starting a long-running session:
 
@@ -205,6 +211,7 @@ Example mutation dry-run:
 ```json
 {
   "command": "tickets create",
+  "project": "Exact project display name from projects list",
   "confirm": true,
   "dryRun": true,
   "args": {
@@ -217,8 +224,8 @@ Example mutation dry-run:
 
 MCP safety behavior:
 
-- Every non-GET command requires top-level `confirm: true` before the bridge can create a network request.
-- `dryRun: true` validates and returns the request shape without reading credentials or sending network traffic.
+- Every non-GET command requires top-level `project` with an exact display name returned by `projects list`, plus `confirm: true`, before the bridge can create a network request. `projects create` is deliberately unavailable through MCP.
+- `dryRun: true` validates and returns the request shape without reading credentials or sending network traffic, while still requiring the project declaration.
 - Unknown commands and unknown argument keys are rejected locally.
 - Import commands do not read local files through MCP. Pass bounded structured JSON using `args.input`; the bridge supplies it to the existing import validator as standard input.
 - `all: true` maps to `--all` and keeps the same 100-page, 100,000-item, and 50 MiB aggregate limits.

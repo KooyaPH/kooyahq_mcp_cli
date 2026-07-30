@@ -70,6 +70,19 @@ The installer registers only the `kooyahq` MCP entry, using absolute Node.js and
 
 The offline doctor checks local files, Codex registration, the MCP handshake, the exact tool list, and skill version. `--online` additionally runs an authenticated profile check without printing credentials.
 
+## Install Cursor desktop and Cursor Agent
+
+Install the KooyaHQ CLI on the same operating system as the Cursor client you use, then run the installer there. A Windows desktop app must use a Windows Node.js/CLI installation; a WSL Cursor Agent must use a WSL Node.js/CLI installation. After configuring KooyaHQ run:
+
+```sh
+kooyahq mcp install --client cursor
+kooyahq mcp doctor --client cursor --online
+cursor-agent mcp list
+cursor-agent mcp list-tools kooyahq
+```
+
+The installer writes absolute Node.js and server-script paths to that operating system's `~/.cursor/mcp.json`, preserving unrelated MCP entries. Restart Cursor desktop after installation. See [AI client tutorials](ai-clients/index.md) for Claude, Gemini, Antigravity, OpenClaw, Hermes, and the remote-gateway requirement for ChatGPT and Replit.
+
 ## Remove
 
 ```sh

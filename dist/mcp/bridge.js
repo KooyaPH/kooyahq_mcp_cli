@@ -38,6 +38,10 @@ export function mcpToolDefinitions() {
                         type: 'string',
                         description: 'Exact command name from kooyahq_discover, for example "tickets list".',
                     },
+                    project: {
+                        type: 'string',
+                        description: 'Required exact KooyaHQ project display name for every mutation. Read it from projects list first.',
+                    },
                     args: {
                         type: 'object',
                         description: 'Command arguments keyed by CLI flag name without leading dashes. File imports use input.',
@@ -90,6 +94,14 @@ async function callCommand(input, dependencies) {
     if (command.method !== 'GET' && call.confirm !== true) {
         throw new ValidationError('MCP mutations require confirm: true before network traffic is allowed.');
     }
+    if (command.name === 'projects create') {
+        throw new ValidationError('Project creation is not available through MCP because separate authorization cannot be verified.');
+    }
+    if (command.method !== 'GET') {
+        requireMcpProject(call.project);
+        if (!call.dryRun)
+            await requireCatalogProject(call.project, dependencies);
+    }
     const argv = buildMcpArgv(command, call);
     return runStructured(argv, dependencies, stdinBytesFor(command, call.args ?? {}));
 }
@@ -100,10 +112,14 @@ function parseCallInput(input) {
     }
     const args = record.args === undefined ? undefined : optionalRecord(record.args, 'kooyahq_call args');
     const confirm = record.confirm;
+    const project = record.project;
     const dryRun = record.dryRun;
     const all = record.all;
     if (confirm !== undefined && typeof confirm !== 'boolean') {
         throw new ValidationError('kooyahq_call confirm must be a boolean.');
+    }
+    if (project !== undefined && typeof project !== 'string') {
+        throw new ValidationError('kooyahq_call project must be a string.');
     }
     if (dryRun !== undefined && typeof dryRun !== 'boolean') {
         throw new ValidationError('kooyahq_call dryRun must be a boolean.');
@@ -113,11 +129,39 @@ function parseCallInput(input) {
     }
     return {
         command: record.command.trim(),
+        ...(project === undefined ? {} : { project }),
         ...(args ? { args } : {}),
         ...(confirm === undefined ? {} : { confirm }),
         ...(dryRun === undefined ? {} : { dryRun }),
         ...(all === undefined ? {} : { all }),
     };
+}
+function requireMcpProject(project) {
+    if (!project?.trim()) {
+        throw new ValidationError('MCP mutations require project: an exact display name returned by projects list.');
+    }
+}
+async function requireCatalogProject(project, dependencies) {
+    const catalog = await runStructured(['projects', 'list', '--all'], dependencies);
+    const names = projectNames(catalog);
+    if (!names.includes(project)) {
+        throw new ValidationError(`Project ${project} is not in the live KooyaHQ project catalog.`);
+    }
+}
+function projectNames(catalog) {
+    if (!catalog || typeof catalog !== 'object' || !Array.isArray(catalog.data)) {
+        throw new ValidationError('KooyaHQ project catalog response is malformed.');
+    }
+    return catalog.data.map((project) => {
+        if (!project || typeof project !== 'object') {
+            throw new ValidationError('KooyaHQ project catalog response is malformed.');
+        }
+        const name = project.name;
+        if (typeof name !== 'string' || !name.trim()) {
+            throw new ValidationError('KooyaHQ project catalog response is malformed.');
+        }
+        return name;
+    });
 }
 function buildMcpArgv(command, input) {
     const args = input.args ?? {};

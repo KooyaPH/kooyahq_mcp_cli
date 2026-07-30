@@ -1,0 +1,1 @@
+{"version":3,"file":"openclaw.js","sourceRoot":"","sources":["../../../src/mcp/setup/openclaw.ts"],"names":[],"mappings":"AAEA,MAAM,UAAU,kCAAkC,CAAC,UAA8B;IAC/E,OAAO;QACL,uGAAuG;QACvG,wHAAwH;QACxH,mFAAmF;QACnF,sBAAsB,IAAI,CAAC,SAAS,CAAC,UAAU,CAAC,OAAO,CAAC,EAAE;QAC1D,yBAAyB,IAAI,CAAC,SAAS,CAAC,UAAU,CAAC,IAAI,CAAC,CAAC,CAAC,CAAC,EAAE;QAC7D,+CAA+C;KAChD,CAAC;AACJ,CAAC"}

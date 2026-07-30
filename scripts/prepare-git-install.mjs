@@ -17,6 +17,7 @@ const requiredFiles = [
   'dist/mcp/setup/index.js',
   'dist/mcp/setup/json-config.js',
   'dist/mcp/setup/local-client.js',
+  'dist/mcp/setup/manual.js',
   'dist/mcp/setup/process.js',
   'dist/mcp/setup/skill.js',
   'dist/mcp/setup/types.js',
