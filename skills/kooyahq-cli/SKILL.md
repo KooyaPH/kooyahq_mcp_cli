@@ -7,6 +7,12 @@ description: Use the local KooyaHQ CLI and MCP tools safely for projects, boards
 
 Use this skill when the user asks to inspect or change KooyaHQ through `kooyahq` or the three local MCP tools.
 
+## Company-internal project gate
+
+This is a mandatory gate for every KooyaHQ mutation associated with work. Before any KooyaHQ mutation, run `kooyahq projects list --all --output json` and map the work to one exact returned project display name. Do not infer a project from a repository path, board name, ticket title, or a similar-looking name.
+
+If no exact project display name matches the work, do not create, update, move, comment on, or time-track anything. State that the project is not in the live KooyaHQ catalog and ask an authorized owner to add or select it. Do not create a project merely to bypass this gate; create one only when an authorized user explicitly requests that project creation, then list projects again and use the returned display name.
+
 ## Start with discovery
 
 Call `kooyahq_discover` before relying on a remembered command contract. Use a narrow scope such as `boards`, `tickets move`, or `time timers start`. The equivalent offline CLI contract is:
@@ -32,7 +38,7 @@ Use `kooyahq_call` with the exact discovered command. Reads do not need confirma
 
 ## Boards and tickets
 
-Discover the board first, keep its exact ID or key, then discover the ticket command. For moves and reorders, use the semantic placement returned by discovery: `before`, `after`, `first`, or `last`. Read the ticket and destination board before moving, then read them again afterward. Do not edit MongoDB or another datastore directly; all changes must pass through the KooyaHQ CLI API.
+After the company-internal project gate passes, discover the board first, keep its exact ID or key, then discover the ticket command. For moves and reorders, use the semantic placement returned by discovery: `before`, `after`, `first`, or `last`. Read the ticket and destination board before moving, then read them again afterward. Do not edit MongoDB or another datastore directly; all changes must pass through the KooyaHQ CLI API.
 
 ## Timers
 

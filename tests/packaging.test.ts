@@ -20,9 +20,9 @@ const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
   : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
-  assert.equal(packageJson.version, '0.3.0');
-  assert.equal(packageLock.version, '0.3.0');
-  assert.equal(packageLock.packages?.['']?.version, '0.3.0');
+  assert.equal(packageJson.version, '0.3.1');
+  assert.equal(packageLock.version, '0.3.1');
+  assert.equal(packageLock.packages?.['']?.version, '0.3.1');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
   assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.equal(packageLock.packages?.['']?.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');

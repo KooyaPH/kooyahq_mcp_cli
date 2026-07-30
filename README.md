@@ -199,6 +199,12 @@ MCP safety behavior:
 - MCP requests are audited by the backend as `clientType: "mcp"` through the `kooyahq-mcp/<version>` user-agent.
 - Backend permissions remain authoritative. The MCP server cannot widen access beyond the configured key owner.
 
+## Company-internal project gate
+
+For work-related mutations, first run `kooyahq projects list --all --output json` and map the work to one exact project display name returned by the live catalog. Do not infer a project from a repository path, board name, ticket title, or a near match.
+
+If no exact project matches, do not create, update, move, comment on, or time-track anything. Report the missing project and wait for an authorized owner to add or select it. Do not create a project solely to bypass this gate; after an explicitly authorized project creation, list projects again and use the returned display name.
+
 ## Command catalog
 
 The catalog below is the supported frontend-parity surface. Run any command with `--help` for its exact parameters.

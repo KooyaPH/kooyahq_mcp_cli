@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { chmod, mkdtemp, mkdir, readFile, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   doctorCodexIntegration,
@@ -52,6 +53,23 @@ test('Codex installer uses absolute MCP targets, preserves other skills, and is 
     await readFile(join(fixture.home, '.codex', 'skills', 'kooyahq-workflow', 'sentinel'), 'utf8'),
     'preserve',
   );
+});
+
+test('packaged skill makes the live project catalog a hard gate for mutations', async () => {
+  const fixture = await setupFixture();
+  const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+  const skillRoot = join(fixture.home, '.codex', 'skills');
+
+  await installSkill(packageRoot, skillRoot);
+
+  const skill = await readFile(join(skillRoot, 'kooyahq-cli', 'SKILL.md'), 'utf8');
+  const mcpGuide = await readFile(join(packageRoot, 'docs', 'codex-mcp.md'), 'utf8');
+  const readme = await readFile(join(packageRoot, 'README.md'), 'utf8');
+  assert.match(skill, /## Company-internal project gate/);
+  assert.match(skill, /Before any KooyaHQ mutation, run `kooyahq projects list --all --output json`/);
+  assert.match(skill, /If no exact project display name matches the work, do not create, update, move, comment on, or time-track anything/);
+  assert.match(mcpGuide, /## Company-internal project gate/);
+  assert.match(readme, /## Company-internal project gate/);
 });
 
 test('Codex installer leaves an exact registration with advanced settings unchanged', async () => {
