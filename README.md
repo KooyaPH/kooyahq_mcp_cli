@@ -20,7 +20,7 @@ ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 ```
 
-### Linux and macOS
+## Linux
 
 ```sh
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
@@ -28,22 +28,36 @@ hash -r
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
-kooyahq mcp install --client codex
-kooyahq mcp doctor --client codex
 ```
 
-### Windows
+## macOS
 
-Run in PowerShell with Git for Windows and Node.js installed:
+Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
+
+```sh
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+hash -r
+kooyahq --version
+kooyahq --help
+kooyahq-mcp --version
+```
+
+## Windows
+
+Install Node.js 18 or newer and Git for Windows, then run this in PowerShell:
 
 ```powershell
+ssh -T git@github.com
+git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
 ```
 
-The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout. To uninstall:
+The committed `dist/` directory is installed directly. TypeScript is not compiled on the target machine. `--install-links=true` prevents npm from leaving a link to its temporary Git checkout.
+
+## Remove
 
 ```sh
 codex mcp remove kooyahq
@@ -88,6 +102,18 @@ kooyahq auth whoami --output json
 ```
 
 The base URL must be an HTTPS origin without a path, query, fragment, or embedded credentials. Plain HTTP is allowed only for localhost development.
+
+## Install MCP in Codex
+
+After `kooyahq configure` and `kooyahq auth whoami --output json` succeed, run the same commands on Linux, macOS, or Windows:
+
+```sh
+kooyahq mcp install --client codex
+kooyahq mcp doctor --client codex
+kooyahq mcp doctor --client codex --online
+```
+
+Restart Codex and open a new thread. The installer writes absolute local targets, registers the MCP server, and installs the `kooyahq-cli` skill; an already-running Codex thread will not reload either automatically.
 
 ## Offline help and agent discovery
 
@@ -198,6 +224,12 @@ MCP safety behavior:
 - `all: true` maps to `--all` and keeps the same 100-page, 100,000-item, and 50 MiB aggregate limits.
 - MCP requests are audited by the backend as `clientType: "mcp"` through the `kooyahq-mcp/<version>` user-agent.
 - Backend permissions remain authoritative. The MCP server cannot widen access beyond the configured key owner.
+
+## Company-internal project gate
+
+For work-related mutations, first run `kooyahq projects list --all --output json` and map the work to one exact project display name returned by the live catalog. Do not infer a project from a repository path, board name, ticket title, or a near match.
+
+If no exact project matches, do not create, update, move, comment on, or time-track anything. Report the missing project and wait for an authorized owner to add or select it. Do not create a project solely to bypass this gate; after an explicitly authorized project creation, list projects again and use the returned display name.
 
 ## Command catalog
 

@@ -14,15 +14,16 @@ const packageLock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
 };
 
 const readme = readFileSync('README.md', 'utf8');
+const installationGuide = readFileSync('docs/installation.md', 'utf8');
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
   ? readFileSync('scripts/smoke-git-install.mjs', 'utf8')
   : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
-  assert.equal(packageJson.version, '0.3.0');
-  assert.equal(packageLock.version, '0.3.0');
-  assert.equal(packageLock.packages?.['']?.version, '0.3.0');
+  assert.equal(packageJson.version, '0.3.1');
+  assert.equal(packageLock.version, '0.3.1');
+  assert.equal(packageLock.packages?.['']?.version, '0.3.1');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
   assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.equal(packageLock.packages?.['']?.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
@@ -108,6 +109,20 @@ test('README documents global GitHub install and configuration steps', () => {
   assert.match(readme, /--description-json.*--acceptance-criteria-json/);
   assert.doesNotMatch(readme, /\buser_123\b/);
   assert.doesNotMatch(readme, /global_prefix|globalPrefix|packagePath|binPath/);
+});
+
+test('installation guides cover CLI and Codex MCP setup on Linux, macOS, and Windows', () => {
+  for (const guide of [readme, installationGuide]) {
+    assert.match(guide, /## Linux/);
+    assert.match(guide, /## macOS/);
+    assert.match(guide, /## Windows/);
+    assert.match(guide, /npm install -g --install-links=true git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
+    assert.match(guide, /kooyahq configure/);
+    assert.match(guide, /kooyahq auth whoami --output json/);
+    assert.match(guide, /kooyahq mcp install --client codex/);
+    assert.match(guide, /kooyahq mcp doctor --client codex --online/);
+    assert.match(guide, /restart Codex.*new thread/i);
+  }
 });
 
 test('README defines timer projects as display names rather than identifiers', () => {
