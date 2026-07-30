@@ -2,20 +2,48 @@
 
 KooyaHQ CLI is a private GitHub package. It requires Node.js 18 or newer, npm, Git, SSH access to GitHub, and read access to `KooyaPH/kooyahq_cli`.
 
-## Install or update
+## Shared prerequisites
 
-Verify access, install the committed artifact, and refresh the shell command cache:
+On every platform, use Node.js 18 or newer, npm, Git, SSH access to GitHub, and read access to `KooyaPH/kooyahq_cli`. Verify access before installation:
 
 ```sh
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
+```
+
+## Linux
+
+```sh
 npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
 hash -r
 kooyahq --version
 kooyahq-mcp --version
 ```
 
-On Windows, run the npm command in PowerShell; `hash -r` is not needed. The package installs committed `dist/` JavaScript, so the target machine does not need TypeScript.
+## macOS
+
+Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
+
+```sh
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+hash -r
+kooyahq --version
+kooyahq-mcp --version
+```
+
+## Windows
+
+Install Node.js 18 or newer and Git for Windows. In PowerShell, run:
+
+```powershell
+ssh -T git@github.com
+git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
+npm install -g --install-links=true git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+kooyahq --version
+kooyahq-mcp --version
+```
+
+The package installs committed `dist/` JavaScript, so the target machine does not need TypeScript. `hash -r` is not required in PowerShell.
 
 ## Configure the KooyaHQ API profile
 
@@ -29,6 +57,8 @@ kooyahq auth whoami --output json
 The secret is accepted only by the hidden prompt. `kooyahq configure show` redacts it. Do not paste credentials into command arguments, documentation, chat, or screenshots.
 
 ## Install the Codex integration
+
+After configuration succeeds, run the same commands on Linux, macOS, or Windows:
 
 ```sh
 kooyahq mcp install --client codex
