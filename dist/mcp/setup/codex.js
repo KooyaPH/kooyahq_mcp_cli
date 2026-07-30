@@ -2,6 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { ConfigError } from '../../core/errors.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from '../server.js';
+import { localMcpDescriptor } from './local-client.js';
 import { commandRequiresShell, windowsShellArgumentsAreSafe } from './process.js';
 import { installSkill } from './skill.js';
 const EXPECTED_TOOLS = ['kooyahq_status', 'kooyahq_discover', 'kooyahq_call'];
@@ -69,7 +70,7 @@ export async function doctorCodexIntegration(dependencies, online) {
     return { ok: checks.every((check) => check.ok), checks };
 }
 function mcpScriptPath(dependencies) {
-    return join(dependencies.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js');
+    return localMcpDescriptor(dependencies).args[0];
 }
 async function requireInstallTargets(nodeExecutable, scriptPath) {
     if (!isAbsolute(nodeExecutable) || !isAbsolute(scriptPath)) {

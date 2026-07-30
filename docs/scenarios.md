@@ -25,6 +25,7 @@ Discover `boards create`, `tickets create`, `tickets get`, `tickets delete`, and
 ```json
 {
   "command": "boards create",
+  "project": "Exact project display name from projects list",
   "confirm": true,
   "dryRun": true,
   "args": {
@@ -41,13 +42,13 @@ After reviewing the request, repeat without `dryRun`. Create the ticket against 
 1. Discover `tickets move` and read the source ticket plus destination board.
 2. Select the destination by exact board ID or key.
 3. Select placement using one discovered semantic option: `before`, `after`, `first`, or `last`.
-4. Call a dry-run with `confirm: true`.
-5. Execute with `confirm: true` after checking the target and placement.
+4. Call a dry-run with the exact `project` display name and `confirm: true`.
+5. Execute with the same `project` and `confirm: true` after checking the target and placement.
 6. Read the ticket and destination ordering again. Report an API error rather than changing MongoDB directly.
 
 ## Mutations and confirmation
 
-Every non-GET MCP command requires top-level `confirm: true`. Use `dryRun: true` on the first call; it validates locally without credentials or network traffic. The actual call omits `dryRun` but retains `confirm: true`. A dry-run is not evidence that the backend authorized or applied the change, so always verify with a read.
+Every non-GET MCP command requires top-level `project` with the exact display name returned by `projects list`, plus `confirm: true`. Use `dryRun: true` on the first call; it validates locally without credentials or network traffic while still requiring the project declaration. The actual call omits `dryRun` but retains `project` and `confirm: true`; it verifies the live catalog immediately before the mutation. MCP deliberately rejects `projects create`. A dry-run is not evidence that the backend authorized or applied the change, so always verify with a read.
 
 For the human CLI, use `--dry-run`, then execute interactively. Use `--yes` only where discovery documents that flag and the user has already approved the exact mutation.
 

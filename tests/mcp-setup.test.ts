@@ -7,12 +7,273 @@ import { fileURLToPath } from 'node:url';
 
 import {
   doctorCodexIntegration,
+  doctorCursorIntegration,
   installCodexIntegration,
+  installCursorIntegration,
   type SetupDependencies,
+  type SetupOverrides,
 } from '../src/mcp/setup/index.js';
 import { codexExecutable, commandRequiresShell } from '../src/mcp/setup/process.js';
 import { installSkill } from '../src/mcp/setup/skill.js';
 import { runCli, type RuntimeDependencies } from '../src/runtime/run.js';
+
+test('Cursor installer configures the desktop app and Cursor Agent without replacing other servers', async () => {
+  const fixture = await setupFixture();
+  const configPath = join(fixture.home, '.cursor', 'mcp.json');
+  await mkdir(dirname(configPath), { recursive: true });
+  await writeFile(configPath, JSON.stringify({
+    mcpServers: { existing: { command: '/other/server', args: ['--keep'] } },
+  }, null, 2));
+
+  await installCursorIntegration(fixture.dependencies);
+  await installCursorIntegration(fixture.dependencies);
+
+  const config = JSON.parse(await readFile(configPath, 'utf8')) as {
+    mcpServers: Record<string, { command: string; args: string[] }>;
+  };
+  assert.deepEqual(config.mcpServers.existing, { command: '/other/server', args: ['--keep'] });
+  assert.deepEqual(config.mcpServers.kooyahq, {
+    command: fixture.dependencies.nodeExecutable,
+    args: [join(fixture.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js')],
+  });
+
+  const report = await doctorCursorIntegration({
+    ...fixture.dependencies,
+    probeMcp: async () => ({
+      protocolVersion: '2025-06-18',
+      tools: ['kooyahq_status', 'kooyahq_discover', 'kooyahq_call'],
+    }),
+  }, true);
+  assert.equal(report.ok, true);
+  assert.match(JSON.stringify(report), /Cursor registration/i);
+  assert.match(JSON.stringify(report), /authenticated KooyaHQ profile/i);
+});
+
+test('Cursor installer rejects a non-local existing kooyahq entry without writing', async () => {
+  const fixture = await setupFixture();
+  const configPath = join(fixture.home, '.cursor', 'mcp.json');
+  const existing = JSON.stringify({
+    mcpServers: {
+      kooyahq: { command: '/other/node', args: ['/other/server.js'] },
+    },
+  });
+  await mkdir(dirname(configPath), { recursive: true });
+  await writeFile(configPath, existing);
+
+  await assert.rejects(installCursorIntegration(fixture.dependencies), /existing kooyahq.*no changes/i);
+  assert.equal(await readFile(configPath, 'utf8'), existing);
+});
+
+test('JSON registration preserves other servers, uses the absolute descriptor, and rejects unsafe configuration', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const geminiConfig = join(fixture.home, '.gemini', 'settings.json');
+  const antigravityConfig = join(fixture.home, '.gemini', 'config', 'mcp_config.json');
+  await mkdir(dirname(geminiConfig), { recursive: true });
+  await mkdir(dirname(antigravityConfig), { recursive: true });
+  await writeFile(geminiConfig, JSON.stringify({
+    keep: { setting: true },
+    mcpServers: { other: { command: '/other/server', args: ['--keep'] } },
+  }, null, 2));
+  await writeFile(antigravityConfig, JSON.stringify({
+    mcpServers: { other: { command: '/other/antigravity', args: ['--keep'] } },
+  }, null, 2));
+
+  const runtime = runtimeDependencies(fixture, output);
+  assert.equal(await runCli(['mcp', 'install', '--client', 'gemini'], runtime), 0);
+  assert.equal(await runCli(['mcp', 'install', '--client', 'antigravity'], runtime), 0);
+
+  const expected = {
+    command: fixture.dependencies.nodeExecutable,
+    args: [join(fixture.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js')],
+  };
+  const gemini = JSON.parse(await readFile(geminiConfig, 'utf8')) as {
+    keep: unknown;
+    mcpServers: Record<string, unknown>;
+  };
+  const antigravity = JSON.parse(await readFile(antigravityConfig, 'utf8')) as {
+    mcpServers: Record<string, unknown>;
+  };
+  assert.deepEqual(gemini.keep, { setting: true });
+  assert.deepEqual(gemini.mcpServers.other, { command: '/other/server', args: ['--keep'] });
+  assert.deepEqual(gemini.mcpServers.kooyahq, expected);
+  assert.deepEqual(antigravity.mcpServers.other, {
+    command: '/other/antigravity', args: ['--keep'],
+  });
+  assert.deepEqual(antigravity.mcpServers.kooyahq, expected);
+  assert.match(await readFile(geminiConfig, 'utf8'), /\n$/);
+
+  await writeFile(geminiConfig, JSON.stringify({
+    ...gemini,
+    mcpServers: {
+      ...gemini.mcpServers,
+      kooyahq: { ...expected, env: { KOOYAHQ_SECRET_ACCESS_KEY: 'stale-secret' } },
+    },
+  }));
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'doctor', '--client', 'gemini'], runtime), 2);
+  assert.match(output.join('\n'), /Gemini CLI has no current KooyaHQ MCP entry/i);
+  assert.doesNotMatch(output.join('\n'), /stale-secret/);
+  const stale = await readFile(geminiConfig, 'utf8');
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'install', '--client', 'gemini'], runtime), 2);
+  assert.match(output.join('\n'), /existing kooyahq.*no changes/i);
+  assert.equal(await readFile(geminiConfig, 'utf8'), stale);
+
+  const unsafe = JSON.stringify({
+    mcpServers: [],
+    KOOYAHQ_SECRET_ACCESS_KEY: 'do-not-print-this',
+  });
+  await writeFile(geminiConfig, unsafe);
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'install', '--client', 'gemini'], runtime), 2);
+  assert.equal(await readFile(geminiConfig, 'utf8'), unsafe);
+  assert.doesNotMatch(output.join('\n'), /do-not-print-this/);
+
+  const reportRuntime = runtimeDependencies(fixture, output);
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'doctor', '--client', 'antigravity'], reportRuntime), 0);
+  assert.match(output.join('\n'), /Antigravity registration/i);
+  assert.match(output.join('\n'), /MCP handshake/i);
+});
+
+test('Claude installs only after its exact absent signal and fails doctor when its registration descriptor is unverifiable', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const registered = new Set<string>();
+  const accessKey = 'access-key-must-not-reach-client-command';
+  const secret = 'secret-must-not-reach-client-command';
+  const runtime = runtimeDependencies(fixture, output, {
+    KOOYAHQ_ACCESS_KEY_ID: accessKey,
+    KOOYAHQ_SECRET_ACCESS_KEY: secret,
+  }, {
+    runCommand: async (command, args) => {
+      calls.push({ command, args });
+      if (args.includes('add-json') || args.includes('add')) registered.add(command);
+      if (args.includes('get')) {
+        return registered.has(command)
+          ? { status: 0, stdout: 'kooyahq: configured', stderr: '' }
+          : claudeMissingResult();
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    },
+    probeMcp: async () => { throw new Error('Claude doctor must not use a direct handshake as registration proof.'); },
+  });
+  const script = join(fixture.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js');
+
+  assert.equal(await runCli(['mcp', 'install', '--client', 'claude'], runtime), 0);
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'doctor', '--client', 'claude'], runtime), 2);
+  assert.match(output.join('\n'), /Claude Code.*cannot verify.*exact.*registration/i);
+
+  assert.deepEqual(calls, [
+    { command: 'claude', args: ['mcp', 'get', 'kooyahq'] },
+    {
+      command: 'claude',
+      args: ['mcp', 'add-json', '--scope', 'user', 'kooyahq', JSON.stringify({
+        type: 'stdio',
+        command: fixture.dependencies.nodeExecutable,
+        args: [script],
+      })],
+    },
+    { command: 'claude', args: ['mcp', 'get', 'kooyahq'] },
+  ]);
+  assert.doesNotMatch(JSON.stringify(calls), new RegExp(`${accessKey}|${secret}`));
+});
+
+test('OpenClaw and Hermes are manual-only and expose their local stdio descriptors without invoking client commands', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const runtime = runtimeDependencies(fixture, output, {}, {
+    runCommand: async (command, args) => {
+      calls.push({ command, args });
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  const script = join(fixture.packageRoot, 'dist', 'bin', 'kooyahq-mcp.js');
+
+  assert.equal(await runCli(['mcp', 'install', '--client', 'openclaw'], runtime), 2);
+  assert.match(output.join('\n'), /OpenClaw.*manual registration.*mcp manual/i);
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'doctor', '--client', 'hermes'], runtime), 2);
+  assert.match(output.join('\n'), /Hermes.*manual registration.*mcp manual/i);
+
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'manual', '--client', 'openclaw'], runtime), 0);
+  assert.match(output.join('\n'), /openclaw mcp add kooyahq --command/i);
+  assert.match(output.join('\n'), new RegExp(fixture.dependencies.nodeExecutable.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+  assert.match(output.join('\n'), new RegExp(script.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+  assert.match(output.join('\n'), /openclaw mcp doctor kooyahq --probe/i);
+
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'manual', '--client', 'hermes'], runtime), 0);
+  assert.match(output.join('\n'), /mcp_servers:/i);
+  assert.match(output.join('\n'), /kooyahq:/i);
+  assert.match(output.join('\n'), /command:/i);
+  assert.match(output.join('\n'), /args:/i);
+  assert.match(output.join('\n'), new RegExp(script.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+
+  assert.deepEqual(calls, []);
+});
+
+test('command-managed installers refuse a registration that cannot be verified as absent', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const runtime = runtimeDependencies(fixture, output, {}, {
+    runCommand: async (command, args) => {
+      calls.push({ command, args });
+      return { status: 0, stdout: 'existing registration', stderr: '' };
+    },
+  });
+
+  assert.equal(await runCli(['mcp', 'install', '--client', 'claude'], runtime), 2);
+  assert.deepEqual(calls, [{ command: 'claude', args: ['mcp', 'get', 'kooyahq'] }]);
+  assert.match(output.join('\n'), /existing kooyahq.*cannot be verified safely/i);
+});
+
+test('local client setup reports missing client targets without writing a JSON registration', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const missing = new Error('spawn claude ENOENT');
+  Object.assign(missing, { code: 'ENOENT' });
+  const commandRuntime = runtimeDependencies(fixture, output, {}, {
+    runCommand: async () => { throw missing; },
+  });
+  assert.equal(await runCli(['mcp', 'install', '--client', 'claude'], commandRuntime), 2);
+  assert.match(output.join('\n'), /Claude Code CLI was not found/i);
+
+  output.length = 0;
+  const missingNode = join(fixture.home, 'missing-node');
+  const jsonRuntime = runtimeDependencies(fixture, output, {}, { nodeExecutable: missingNode });
+  assert.equal(await runCli(['mcp', 'install', '--client', 'gemini'], jsonRuntime), 2);
+  await assert.rejects(readFile(join(fixture.home, '.gemini', 'settings.json')), { code: 'ENOENT' });
+  assert.match(output.join('\n'), /target is missing/i);
+});
+
+test('root and MCP help distinguish automated clients from manual-only clients', async () => {
+  const fixture = await setupFixture();
+  const output: string[] = [];
+  const runtime = runtimeDependencies(fixture, output);
+  const automatedClients = ['codex', 'cursor', 'claude', 'gemini', 'antigravity'];
+
+  assert.equal(await runCli(['--help'], runtime), 0);
+  for (const client of automatedClients) assert.match(output.join('\n'), new RegExp(client));
+  assert.match(output.join('\n'), /mcp manual --client <openclaw\|hermes>/i);
+
+  output.length = 0;
+  assert.equal(await runCli(['mcp', '--help'], runtime), 0);
+  for (const client of automatedClients) assert.match(output.join('\n'), new RegExp(client));
+  assert.match(output.join('\n'), /manual-only clients:/i);
+  assert.match(output.join('\n'), /openclaw.*manual/i);
+  assert.match(output.join('\n'), /hermes.*manual/i);
+
+  output.length = 0;
+  assert.equal(await runCli(['mcp', 'install', '--client', 'unknown'], runtime), 2);
+  assert.match(output.join('\n'), /codex\|cursor\|claude\|gemini\|antigravity/);
+});
 
 test('Codex installer uses absolute MCP targets, preserves other skills, and is idempotent', async () => {
   const fixture = await setupFixture();
@@ -68,6 +329,8 @@ test('packaged skill makes the live project catalog a hard gate for mutations', 
   assert.match(skill, /## Company-internal project gate/);
   assert.match(skill, /Before any KooyaHQ mutation, run `kooyahq projects list --all --output json`/);
   assert.match(skill, /If no exact project display name matches the work, do not create, update, move, comment on, or time-track anything/);
+  assert.match(skill, /top-level `project`.*exact live project display name/i);
+  assert.match(skill, /`projects create`.*rejected/i);
   assert.match(mcpGuide, /## Company-internal project gate/);
   assert.match(readme, /## Company-internal project gate/);
 });
@@ -489,6 +752,7 @@ async function setupFixture(): Promise<{
       homeDirectory: home,
       codexRoot: join(home, '.codex'),
       codexCommand: 'codex',
+      claudeCommand: 'claude',
       platform: 'linux',
       packageRoot,
       version: '0.3.0',
@@ -505,6 +769,7 @@ function runtimeDependencies(
   fixture: Awaited<ReturnType<typeof setupFixture>>,
   output: string[],
   environment: NodeJS.ProcessEnv = {},
+  mcpSetup: SetupOverrides = {},
 ): RuntimeDependencies {
   return {
     environment,
@@ -533,6 +798,7 @@ function runtimeDependencies(
         protocolVersion: '2025-06-18',
         tools: ['kooyahq_status', 'kooyahq_discover', 'kooyahq_call'],
       }),
+      ...mcpSetup,
     },
   };
 }
@@ -549,5 +815,13 @@ function codexMissingResult(): { status: number; stdout: string; stderr: string 
     status: 1,
     stdout: '',
     stderr: "Error: No MCP server named 'kooyahq' found.\n",
+  };
+}
+
+function claudeMissingResult(): { status: number; stdout: string; stderr: string } {
+  return {
+    status: 1,
+    stdout: '',
+    stderr: 'No MCP server named "kooyahq". Run `claude mcp add` to add one.\n',
   };
 }

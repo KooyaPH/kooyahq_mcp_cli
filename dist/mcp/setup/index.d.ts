@@ -1,6 +1,10 @@
 import type { SetupOverrides } from './types.js';
+export { doctorAntigravityIntegration, installAntigravityIntegration } from './antigravity.js';
+export { doctorClaudeIntegration, installClaudeIntegration } from './claude.js';
 export { doctorCodexIntegration, installCodexIntegration } from './codex.js';
-export type { SetupDependencies, SetupOverrides } from './types.js';
+export { doctorCursorIntegration, installCursorIntegration } from './cursor.js';
+export { doctorGeminiIntegration, installGeminiIntegration } from './gemini.js';
+export type { McpClient, SetupDependencies, SetupOverrides } from './types.js';
 interface SetupContext {
     homeDirectory: string;
     version: string;

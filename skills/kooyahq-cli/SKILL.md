@@ -26,11 +26,11 @@ Use the exact command name and argument keys returned by discovery. Prefer exact
 
 ## Reads and mutations
 
-Use `kooyahq_call` with the exact discovered command. Reads do not need confirmation. For every mutation:
+Use `kooyahq_call` with the exact discovered command. Reads do not need confirmation. Every MCP mutation must provide a top-level `project` field equal to an exact live project display name returned by `kooyahq projects list --all --output json`. MCP `projects create` is rejected; an authorized owner must create the project through an approved non-MCP workflow before it can be used here. For every allowed mutation:
 
-1. Call it first with top-level `dryRun: true` and `confirm: true`.
+1. Call it first with top-level `project`, `dryRun: true`, and `confirm: true`.
 2. Inspect the returned method, path, query, and body with the user when the change is consequential.
-3. Execute with top-level `confirm: true` only after the intended target is exact.
+3. Execute with the same top-level `project` and `confirm: true` only after the intended target is exact.
 4. Read the affected resource again and verify the result.
 5. Clean up temporary boards, tickets, timers, or test data created for verification.
 

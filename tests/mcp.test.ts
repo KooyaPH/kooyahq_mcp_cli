@@ -127,10 +127,129 @@ test('MCP mutations require explicit confirmation before network traffic', async
   assert.equal(networkCalls, 0);
 });
 
+test('MCP mutations require an exact live project catalog entry', async () => {
+  const requestPaths: string[] = [];
+  const configured = dependencies({
+    environment: {
+      KOOYAHQ_BASE_URL: 'https://example.com',
+      KOOYAHQ_ACCESS_KEY_ID: 'id',
+      KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+    },
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      requestPaths.push(url.pathname);
+      if (url.pathname === '/api/cli/v1/projects') {
+        return new Response(JSON.stringify({ data: [{ name: 'KooyaHQ CLI' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.pathname === '/api/cli/v1/tickets') {
+        return new Response(JSON.stringify({ id: 'ticket-1' }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected request ${url.pathname}`);
+    },
+  });
+  const input = {
+    command: 'tickets create',
+    confirm: true,
+    args: {
+      'board-id': '507f1f77bcf86cd799439011',
+      'ticket-type': 'task',
+      title: 'Release',
+    },
+  };
+
+  await assert.rejects(
+    callMcpTool('kooyahq_call', input, configured),
+    /require project/i,
+  );
+  assert.deepEqual(requestPaths, []);
+
+  await assert.rejects(
+    callMcpTool('kooyahq_call', { ...input, project: 'Unknown project' }, configured),
+    /not in the live KooyaHQ project catalog/i,
+  );
+  assert.deepEqual(requestPaths, ['/api/cli/v1/projects']);
+
+  const result = await callMcpTool(
+    'kooyahq_call',
+    { ...input, project: 'KooyaHQ CLI' },
+    configured,
+  );
+  assert.deepEqual(result, { id: 'ticket-1' });
+  assert.deepEqual(requestPaths, [
+    '/api/cli/v1/projects',
+    '/api/cli/v1/projects',
+    '/api/cli/v1/tickets',
+  ]);
+});
+
+test('MCP rejects a project catalog containing any malformed entry', async () => {
+  let ticketRequests = 0;
+  await assert.rejects(
+    callMcpTool('kooyahq_call', {
+      command: 'tickets create',
+      project: 'KooyaHQ CLI',
+      confirm: true,
+      args: {
+        'board-id': '507f1f77bcf86cd799439011',
+        'ticket-type': 'task',
+        title: 'Release',
+      },
+    }, dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      fetch: async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname === '/api/cli/v1/projects') {
+          return new Response(JSON.stringify({ data: [{ name: 'KooyaHQ CLI' }, { name: 7 }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        ticketRequests += 1;
+        return new Response('{}');
+      },
+    })),
+    /project catalog response is malformed/i,
+  );
+  assert.equal(ticketRequests, 0);
+});
+
+test('MCP blocks project creation because it cannot verify separate authorization', async () => {
+  await assert.rejects(
+    callMcpTool('kooyahq_call', {
+      command: 'projects create',
+      project: 'KooyaHQ CLI',
+      confirm: true,
+      args: { name: 'KooyaHQ CLI' },
+    }, dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      fetch: async () => new Response(JSON.stringify({ data: [{ name: 'KooyaHQ CLI' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    })),
+    /project creation.*not available through MCP/i,
+  );
+});
+
 test('MCP dry-run validates mutations without credentials or network traffic', async () => {
   let networkCalls = 0;
   const result = await callMcpTool('kooyahq_call', {
     command: 'tickets create',
+    project: 'KooyaHQ CLI',
     confirm: true,
     dryRun: true,
     args: {
@@ -162,6 +281,7 @@ test('MCP ticket imports use bounded structured input instead of filesystem read
   let capturedBody: unknown;
   const result = await callMcpTool('kooyahq_call', {
     command: 'tickets import preview',
+    project: 'KooyaHQ CLI',
     confirm: true,
     args: {
       'board-id': '507f1f77bcf86cd799439011',
@@ -173,7 +293,14 @@ test('MCP ticket imports use bounded structured input instead of filesystem read
       KOOYAHQ_ACCESS_KEY_ID: 'id',
       KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
     },
-    fetch: async (_input, init) => {
+    fetch: async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/cli/v1/projects') {
+        return new Response(JSON.stringify({ data: [{ name: 'KooyaHQ CLI' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
       capturedBody = JSON.parse(String(init?.body));
       return new Response(JSON.stringify({ operationId: 'op-1' }), {
         status: 200,

@@ -21,7 +21,11 @@ const DEFAULT_LIMITS: ProcessLimits = {
 };
 
 export function codexExecutable(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'codex.cmd' : 'codex';
+  return clientExecutable(platform, 'codex');
+}
+
+export function clientExecutable(platform: NodeJS.Platform, name: string): string {
+  return platform === 'win32' ? `${name}.cmd` : name;
 }
 
 export function commandRequiresShell(platform: NodeJS.Platform, command: string): boolean {

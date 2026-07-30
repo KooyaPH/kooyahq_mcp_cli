@@ -7,6 +7,9 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const MAX_MCP_LINE_BYTES = 1024 * 1024;
+// The executable is launched through tsx while the full suite starts other TypeScript workers.
+// Keep this above observed cold-start contention so it tests protocol recovery, not compilation speed.
+const MCP_RESPONSE_TIMEOUT_MS = 15_000;
 
 interface JsonRpcResponse {
   jsonrpc: string;
@@ -118,7 +121,10 @@ function nextLine(
   const line = queue.shift();
   if (line !== undefined) return Promise.resolve(line);
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timed out waiting for MCP response line.')), 5_000);
+    const timeout = setTimeout(
+      () => reject(new Error('Timed out waiting for MCP response line.')),
+      MCP_RESPONSE_TIMEOUT_MS,
+    );
     waiters.push((value) => {
       clearTimeout(timeout);
       resolve(value);

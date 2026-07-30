@@ -10,7 +10,10 @@ const DEFAULT_LIMITS = {
     killGraceMs: KILL_GRACE_MS,
 };
 export function codexExecutable(platform) {
-    return platform === 'win32' ? 'codex.cmd' : 'codex';
+    return clientExecutable(platform, 'codex');
+}
+export function clientExecutable(platform, name) {
+    return platform === 'win32' ? `${name}.cmd` : name;
 }
 export function commandRequiresShell(platform, command) {
     return platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);

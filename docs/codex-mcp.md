@@ -34,7 +34,7 @@ kooyahq mcp doctor --client codex --online
 
 For work-related mutations, first run `kooyahq projects list --all --output json` and map the work to one exact project display name returned by the live catalog. Do not infer a project from a repository path, board name, ticket title, or a near match.
 
-If no exact project matches, do not create, update, move, comment on, or time-track anything. Report the missing project and wait for an authorized owner to add or select it. Do not create a project solely to bypass this gate; after an explicitly authorized project creation, list projects again and use the returned display name.
+If no exact project matches, do not create, update, move, comment on, or time-track anything. Report the missing project and wait for an authorized owner to add or select it. `projects create` is intentionally unavailable through MCP; use the separately authorized human workflow, then list projects again before any MCP mutation.
 
 ## Troubleshooting
 
