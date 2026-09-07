@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Linux / Node ${{ matrix.node }}
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke-test MCP handshake and tools
+        run: node scripts/smoke-mcp.mjs
+
+      - name: Verify committed distribution
+        run: node scripts/verify-dist.mjs
+
+      - name: Verify Git installation assets
+        run: node scripts/prepare-git-install.mjs
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+      - name: Pack installable artifact
+        run: |
+          mkdir -p "$RUNNER_TEMP/kooyahq-cli-pack"
+          npm pack --pack-destination "$RUNNER_TEMP/kooyahq-cli-pack"
+
+      - name: Install packed artifact
+        run: npm install --prefix "$RUNNER_TEMP/kooyahq-cli-install" "$RUNNER_TEMP"/kooyahq-cli-pack/kooyahq-cli-*.tgz
+
+      - name: Smoke-test installed command
+        run: |
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --version
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq" --help
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq-mcp" --version
+          "$RUNNER_TEMP/kooyahq-cli-install/node_modules/.bin/kooyahq-mcp" --help
+
+      - name: Smoke-test repeat local Git global installation
+        if: matrix.node == 22
+        run: node scripts/smoke-git-install.mjs
+
+  cross-platform-smoke:
+    name: ${{ matrix.os }} / Node 18
+    if: ${{ vars.KOOYAHQ_CLI_ENABLE_HOSTED_SMOKE == 'true' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build and verify committed distribution
+        run: |
+          npm run build
+          node scripts/verify-dist.mjs
+        shell: bash
+
+      - name: Smoke-test command and machine-readable skill
+        run: |
+          node dist/bin/kooyahq.js --version
+          node dist/bin/kooyahq.js --help >/dev/null
+          node dist/bin/kooyahq.js --skill tickets create --output json >/dev/null
+          node dist/bin/kooyahq-mcp.js --version
+          node dist/bin/kooyahq-mcp.js --help >/dev/null
+          node scripts/smoke-mcp.mjs
+        shell: bash
+
+      - name: Smoke-test local Git global installation and command shim
+        run: node scripts/smoke-git-install.mjs
+
+  required:
+    name: Required checks
+    runs-on: [self-hosted, Linux]
+    needs: [verify, cross-platform-smoke]
+    if: ${{ always() }}
+    steps:
+      - name: Verify matrix result
+        run: |
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "Verification failed: linux=${{ needs.verify.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.cross-platform-smoke.result }}" != "success" ] && [ "${{ needs.cross-platform-smoke.result }}" != "skipped" ]; then
+            echo "Verification failed: cross-platform=${{ needs.cross-platform-smoke.result }}"
+            exit 1
+          fi
+          echo "Required Linux checks passed; cross-platform=${{ needs.cross-platform-smoke.result }}."

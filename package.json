@@ -1,0 +1,36 @@
+{
+  "name": "kooyahq-cli",
+  "version": "0.4.1",
+  "description": "Internal command-line client for KooyaHQ",
+  "license": "UNLICENSED",
+  "author": "KooyaHQ Engineering",
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com/KooyaPH/kooyahq_cli.git"
+  },
+  "private": true,
+  "type": "module",
+  "bin": {
+    "kooyahq": "dist/bin/kooyahq.js",
+    "kooyahq-mcp": "dist/bin/kooyahq-mcp.js"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "skills",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/run-tests.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
