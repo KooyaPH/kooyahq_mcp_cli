@@ -1,8 +1,8 @@
 # KooyaHQ CLI
 
-Private, authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, and notifications. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
+Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, and notifications. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
 
-The repository is private, the package is not published to npmjs.com, and Node.js 18 or newer is required. GitHub access is required to install it.
+The package is not published to npmjs.com, and Node.js 18 or newer is required. Install the tagged GitHub release; backend authorization remains mandatory.
 
 ## Install
 
@@ -10,20 +10,18 @@ Prerequisites:
 
 - Node.js 18 or newer and npm
 - Git and SSH
-- Read access to `KooyaPH/kooyahq_cli`
-- A GitHub SSH key available to the current shell
+- Network access to GitHub
 
 Confirm repository access:
 
 ```sh
-ssh -T git@github.com
-git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
+git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
 ```
 
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 hash -r
 kooyahq --version
 kooyahq --help
@@ -35,7 +33,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 hash -r
 kooyahq --version
 kooyahq --help
@@ -47,9 +45,8 @@ kooyahq-mcp --version
 Install Node.js 18 or newer and Git for Windows, then run this in PowerShell:
 
 ```powershell
-ssh -T git@github.com
-git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
@@ -63,7 +60,7 @@ For a Git-based global upgrade, remove the current package before installing the
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 hash -r
 kooyahq --version
 ```

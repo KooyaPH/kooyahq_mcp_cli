@@ -21,9 +21,9 @@ const gitInstallSmoke = existsSync('scripts/smoke-git-install.mjs')
   : '';
 
 test('GitHub installs use committed dist files without compiling TypeScript', () => {
-  assert.equal(packageJson.version, '0.4.1');
-  assert.equal(packageLock.version, '0.4.1');
-  assert.equal(packageLock.packages?.['']?.version, '0.4.1');
+  assert.equal(packageJson.version, '0.1.0');
+  assert.equal(packageLock.version, '0.1.0');
+  assert.equal(packageLock.packages?.['']?.version, '0.1.0');
   assert.equal(packageJson.bin?.kooyahq, 'dist/bin/kooyahq.js');
   assert.equal(packageJson.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
   assert.equal(packageLock.packages?.['']?.bin?.['kooyahq-mcp'], 'dist/bin/kooyahq-mcp.js');
@@ -83,7 +83,7 @@ test('README documents deterministic Codex setup and startup recovery', () => {
 });
 
 test('README documents global GitHub install and configuration steps', () => {
-  assert.match(readme, /npm install -g --install-links=true --ignore-scripts git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
+  assert.match(readme, /npm install -g --install-links=true --ignore-scripts git\+https:\/\/github\.com\/KooyaPH\/kooyahq_mcp_cli\.git#v0\.1\.0/);
   assert.match(readme, /npm uninstall -g kooyahq-cli/);
   assert.match(readme, /hash -r/);
   assert.match(readme, /tsc: not found/);
@@ -121,7 +121,7 @@ test('installation guides cover CLI and Codex MCP setup on Linux, macOS, and Win
     assert.match(guide, /## macOS/);
     assert.match(guide, /## Windows/);
     assert.match(guide, /## Update/);
-    assert.match(guide, /npm install -g --install-links=true --ignore-scripts git\+ssh:\/\/git@github\.com\/KooyaPH\/kooyahq_cli\.git#main/);
+    assert.match(guide, /npm install -g --install-links=true --ignore-scripts git\+https:\/\/github\.com\/KooyaPH\/kooyahq_mcp_cli\.git#v0\.1\.0/);
     assert.match(guide, /kooyahq configure/);
     assert.match(guide, /kooyahq auth whoami --output json/);
     assert.match(guide, /kooyahq mcp install --client codex/);

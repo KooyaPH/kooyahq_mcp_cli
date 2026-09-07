@@ -14,7 +14,7 @@ git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 hash -r
 kooyahq --version
 kooyahq-mcp --version
@@ -25,7 +25,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 hash -r
 kooyahq --version
 kooyahq-mcp --version
@@ -38,7 +38,7 @@ Install Node.js 18 or newer and Git for Windows. In PowerShell, run:
 ```powershell
 ssh -T git@github.com
 git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 kooyahq --version
 kooyahq-mcp --version
 ```
@@ -51,7 +51,7 @@ For a Git-based global upgrade, remove the current package before installing the
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+ssh://git@github.com/KooyaPH/kooyahq_cli.git#main
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
 hash -r
 kooyahq --version
 ```
