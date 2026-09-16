@@ -1,6 +1,6 @@
 # KooyaHQ CLI
 
-Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, announcements, presence locations, settings, documentation, KooyaPedia, posts, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
+Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, events, announcements, presence locations, settings, documentation, KooyaPedia, posts, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
 
 The package is not published to npmjs.com, and Node.js 18 or newer is required. Install the tagged GitHub release; backend authorization remains mandatory.
 
@@ -481,13 +481,21 @@ events poll
 events cursor
 ```
 
-Permission-gated live HQ signals for the access-key owner (notifications, chat, tickets). Requires `cli:access` plus each channel’s read permission; unauthorized channels are omitted. If the key has no permitted channels, the API returns 403.
+Permission-gated live HQ signals for the access-key owner (notifications, chat, tickets). Requires `cli:access` plus each channel’s read permission; unauthorized channels are omitted from the response. If the key has no permitted channels, the API returns 403.
+
+MCP loop (preferred for hosts):
+
+```sh
+kooyahq events cursor --output json
+kooyahq events poll --since CURSOR --output ndjson
+# repeat poll with the latest returned cursor
+```
 
 - `events cursor` — bootstrap the latest cursor.
-- `events poll --since CURSOR` — one-shot buffer read for MCP / `kooyahq_call` loops (`--output ndjson` prints one event object per line).
-- `events watch` — long-lived SSE side process (CLI only); writes one JSON object per line (`cursor`, `channel`, `event`, `data`, `at`). Use `--channels notifications,chat,tickets` to narrow. MCP hosts must not call `events watch`; use `events poll` / `events cursor` over MCP instead.
+- `events poll --since CURSOR` — one-shot buffer read for MCP / `kooyahq_call` loops (`--output ndjson` prints one event object per line). Optional with `--channels notifications,chat,tickets` (comma-separated) to subscribe only to allowed channels you need.
+- `events watch` — long-lived SSE side process (CLI only); writes one JSON object per line (`cursor`, `channel`, `event`, `data`, `at`). Same `--channels` flag. MCP hosts must not call `events watch`; use `events poll` / `events cursor` over MCP instead, or run `kooyahq events watch` as a separate CLI process.
 
-Default channels when `--channels` is omitted: all three the key is permitted to subscribe to.
+Default channels when `--channels` is omitted: all channels the key is permitted to subscribe to.
 
 ### Announcements
 
@@ -588,7 +596,7 @@ chat conversations unarchive
 chat conversations delete
 ```
 
-HTTP request/response only. Poll unread or list messages for updates; sockets, SSE, and `chat watch` are out of scope.
+Chat commands remain HTTP request/response (list, send, unread, and so on). There is no dedicated `chat watch`. For live chat, ticket, and notification signals, use `events watch` (CLI process) or `events poll` / `events cursor` (MCP).
 
 ### Meet
 

@@ -191,6 +191,19 @@ test('README defines timer projects as display names rather than identifiers', (
   assert.doesNotMatch(readme, /time timers start --project project_\d+/i);
 });
 
+test('README documents permission-gated events and steers chat live signals to events', () => {
+  assert.match(readme, /notifications, events, announcements/);
+  assert.match(readme, /### Events/);
+  assert.match(readme, /events cursor/);
+  assert.match(readme, /events poll --since CURSOR/);
+  assert.match(readme, /events watch/);
+  assert.match(readme, /API returns 403/);
+  assert.match(readme, /--channels notifications,chat,tickets/);
+  assert.match(readme, /no dedicated `chat watch`/i);
+  assert.match(readme, /live chat, ticket, and notification signals.*events watch/is);
+  assert.doesNotMatch(readme, /sockets, SSE, and `chat watch` are out of scope/);
+});
+
 test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () => {
   assert.match(workflow, /node scripts\/verify-dist\.mjs/);
   assert.ok(existsSync('scripts/verify-dist.mjs'));
