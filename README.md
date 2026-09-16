@@ -239,6 +239,7 @@ MCP safety behavior:
 - `all: true` maps to `--all` and keeps the same 100-page, 100,000-item, and 50 MiB aggregate limits.
 - MCP requests are audited by the backend as `clientType: "mcp"` through the `kooyahq-mcp/<version>` user-agent.
 - Backend permissions remain authoritative. The MCP server cannot widen access beyond the configured key owner.
+- `events watch` is rejected over MCP (long-lived SSE). MCP hosts must use `events poll` / `events cursor`, or run `kooyahq events watch` as a separate CLI process.
 
 ## Company-internal project gate
 
@@ -480,11 +481,11 @@ events poll
 events cursor
 ```
 
-Permission-gated live HQ signals for the access-key owner (notifications, chat, tickets). Requires `cli:access` plus each channel’s read permission; unauthorized channels are omitted rather than rejecting the request.
+Permission-gated live HQ signals for the access-key owner (notifications, chat, tickets). Requires `cli:access` plus each channel’s read permission; unauthorized channels are omitted. If the key has no permitted channels, the API returns 403.
 
 - `events cursor` — bootstrap the latest cursor.
 - `events poll --since CURSOR` — one-shot buffer read for MCP / `kooyahq_call` loops (`--output ndjson` prints one event object per line).
-- `events watch` — long-lived SSE side process; writes one JSON object per line (`cursor`, `channel`, `event`, `data`, `at`). Use `--channels notifications,chat,tickets` to narrow.
+- `events watch` — long-lived SSE side process (CLI only); writes one JSON object per line (`cursor`, `channel`, `event`, `data`, `at`). Use `--channels notifications,chat,tickets` to narrow. MCP hosts must not call `events watch`; use `events poll` / `events cursor` over MCP instead.
 
 Default channels when `--channels` is omitted: all three the key is permitted to subscribe to.
 
