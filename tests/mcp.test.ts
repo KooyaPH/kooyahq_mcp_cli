@@ -245,6 +245,27 @@ test('MCP blocks project creation because it cannot verify separate authorizatio
   );
 });
 
+test('MCP rejects events watch and steers hosts to poll or a CLI side process', async () => {
+  let networkCalls = 0;
+  await assert.rejects(
+    callMcpTool('kooyahq_call', {
+      command: 'events watch',
+    }, dependencies({
+      environment: {
+        KOOYAHQ_BASE_URL: 'https://example.com',
+        KOOYAHQ_ACCESS_KEY_ID: 'id',
+        KOOYAHQ_SECRET_ACCESS_KEY: 'secret',
+      },
+      fetch: async () => {
+        networkCalls += 1;
+        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+    })),
+    /events watch is CLI-process-only|events poll or events cursor/i,
+  );
+  assert.equal(networkCalls, 0);
+});
+
 test('MCP dry-run validates mutations without credentials or network traffic', async () => {
   let networkCalls = 0;
   const result = await callMcpTool('kooyahq_call', {

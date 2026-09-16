@@ -20,13 +20,14 @@ const DOMAIN_WORKFLOWS: Record<string, string> = {
   analytics: 'Choose the analytics view, supply its documented date range when required, and optionally narrow time analytics to an authorized user.',
   users: 'List users before assigning work; management actions require the corresponding server-side user permission.',
   notifications: 'List the current user notifications, inspect unread count, then mark individual or all notifications read.',
+  events: 'Bootstrap with events cursor, then poll for MCP hosts or run events watch as a side process for live NDJSON lines.',
   announcements: 'List or read announcements, then create or update them when you have announcement write permission.',
   presence: 'List current location presence snapshots; live presence updates are not available over CLI/MCP.',
   settings: 'Read theme, preferences, or profile, then apply the smallest authorized personalization change.',
   documentation: 'List documentation, create a link or upload a file, then pin, update, or delete as permitted.',
   kooyapedia: 'Open home or search, then fetch a page slug when needed.',
   posts: 'List feed posts, create or update content, then manage comments, reactions, and poll votes.',
-  chat: 'List conversations or contacts, send messages over HTTP, and poll unread counts; live sockets are out of scope.',
+  chat: 'List conversations or contacts, send messages over HTTP, and poll unread counts; for live chat lines use events watch/poll.',
   meet: 'List contacts or create a room token, then manage recordings and egress when recording permission allows.',
 };
 
@@ -108,6 +109,15 @@ export function commandSummary(command: CommandSpec): string {
   if (command.name === 'tickets improve') return 'Preview AI improvement suggestions for a ticket.';
   if (command.name === 'tickets improve-draft') {
     return 'Preview AI improvement suggestions for a ticket draft.';
+  }
+  if (command.name === 'events watch') {
+    return 'Watch permission-gated live HQ events as NDJSON over SSE.';
+  }
+  if (command.name === 'events poll') {
+    return 'Poll buffered HQ events after a cursor for MCP hosts.';
+  }
+  if (command.name === 'events cursor') {
+    return 'Read the latest HQ event cursor for bootstrap.';
   }
   const tokens = command.name.split(' ');
   const action = tokens.at(-1)!;

@@ -97,6 +97,9 @@ async function callCommand(input, dependencies) {
     if (command.name === 'projects create') {
         throw new ValidationError('Project creation is not available through MCP because separate authorization cannot be verified.');
     }
+    if (command.name === 'events watch') {
+        throw new ValidationError('events watch is CLI-process-only and cannot run over MCP. Use events poll or events cursor via kooyahq_call, or run `kooyahq events watch` as a side process.');
+    }
     if (command.method !== 'GET') {
         requireMcpProject(call.project);
         if (!call.dryRun)

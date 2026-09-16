@@ -83,6 +83,59 @@ export class ApiClient {
         }
         return payload;
     }
+    async streamSse(path, requestOptions, onEvent, signal) {
+        const url = new URL(`${API_ROOT}${path}`, this.baseUrl);
+        for (const [key, value] of Object.entries(requestOptions.query ?? {})) {
+            if (value !== undefined)
+                url.searchParams.set(key, String(value));
+        }
+        const headers = new Headers({
+            accept: 'text/event-stream',
+            authorization: `KooyaKey ${this.options.accessKeyId}:${this.options.secretAccessKey}`,
+            'user-agent': `${this.options.clientName ?? 'kooyahq-cli'}/${this.options.version} (${this.platform}; node/${this.nodeVersion})`,
+        });
+        let response;
+        try {
+            const init = {
+                method: 'GET',
+                headers,
+                redirect: 'error',
+            };
+            if (signal)
+                init.signal = signal;
+            response = await this.fetchImplementation(url, init);
+        }
+        catch {
+            throw new NetworkError();
+        }
+        if (!response.ok) {
+            const payload = await parseResponse(response, this.maxResponseBytes);
+            throw new ApiError(redactCredentials(errorMessage(payload, response.status), this.options), response.status);
+        }
+        if (!response.body)
+            throw new NetworkError('KooyaHQ event stream returned no body.');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done)
+                    break;
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop() ?? '';
+                for (const part of parts) {
+                    const parsed = parseSseBlock(part);
+                    if (parsed)
+                        onEvent(parsed.event, parsed.data);
+                }
+            }
+        }
+        finally {
+            reader.releaseLock();
+        }
+    }
     async sendWithTimeout(url, method, headers, init) {
         const controller = new AbortController();
         init.signal = controller.signal;
@@ -248,5 +301,29 @@ function redactCredentials(message, credentials) {
     return [credentials.secretAccessKey, credentials.accessKeyId]
         .filter(Boolean)
         .reduce((safe, credential) => safe.split(credential).join('[REDACTED]'), message);
+}
+function parseSseBlock(block) {
+    let eventName = 'message';
+    const dataLines = [];
+    for (const line of block.split('\n')) {
+        if (!line || line.startsWith(':'))
+            continue;
+        if (line.startsWith('event:')) {
+            eventName = line.slice('event:'.length).trim() || 'message';
+            continue;
+        }
+        if (line.startsWith('data:')) {
+            dataLines.push(line.slice('data:'.length).trimStart());
+        }
+    }
+    if (dataLines.length === 0)
+        return null;
+    const raw = dataLines.join('\n');
+    try {
+        return { event: eventName, data: JSON.parse(raw) };
+    }
+    catch {
+        return { event: eventName, data: raw };
+    }
 }
 //# sourceMappingURL=client.js.map

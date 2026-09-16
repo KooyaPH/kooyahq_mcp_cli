@@ -28,6 +28,7 @@ const EXPECTED_COMMANDS = [
   'chat messages delete', 'chat messages list', 'chat messages send', 'chat messages update',
   'documentation create-file', 'documentation create-link', 'documentation delete', 'documentation list',
   'documentation pin', 'documentation unpin', 'documentation update',
+  'events cursor', 'events poll', 'events watch',
   'kooyapedia home', 'kooyapedia pages get', 'kooyapedia pages list',
   'kooyapedia search', 'kooyapedia suggest',
   'meet contacts list', 'meet egress active', 'meet egress start', 'meet egress status', 'meet egress stop',
@@ -805,6 +806,23 @@ test('maps user and notification fields to the live API', () => {
   assert.throws(() => buildRequest(commandCatalog, ['users', 'create', '--email', 'missing@example.com']), /requires --name/);
   assert.deepEqual(buildRequest(commandCatalog, ['notifications', 'list', '--unread-only', 'true']).query, { unreadOnly: true });
   assert.throws(() => buildRequest(commandCatalog, ['notifications', 'count', '--type', 'ticket']), /Unknown option --type/);
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'events', 'poll', '--since', '12', '--channels', 'notifications,chat', '--limit', '25',
+  ]), {
+    method: 'GET',
+    path: '/events',
+    query: { since: '12', channels: ['notifications', 'chat'], limit: 25 },
+    output: 'table',
+  });
+  assert.deepEqual(buildRequest(commandCatalog, ['events', 'cursor']).path, '/events/cursor');
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'events', 'watch', '--channels', 'tickets', '--output', 'ndjson',
+  ]), {
+    method: 'GET',
+    path: '/events/stream',
+    query: { channels: ['tickets'] },
+    output: 'ndjson',
+  });
 });
 
 test('maps remaining frontend project and user management actions', () => {

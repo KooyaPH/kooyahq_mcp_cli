@@ -36,6 +36,10 @@ Use `kooyahq_call` with the exact discovered command. Reads do not need confirma
 
 `confirm: true` is an MCP bridge safety gate. Backend authorization and resource membership still apply.
 
+## Live events
+
+For live HQ signals (notifications, chat, tickets), MCP hosts must use `events cursor` then `events poll` via `kooyahq_call`. Do not call `events watch` over MCP; it is rejected. Run `kooyahq events watch` only as a separate CLI side process when a long-lived NDJSON stream is needed.
+
 ## Boards and tickets
 
 After the company-internal project gate passes, discover the board first, keep its exact ID or key, then discover the ticket command. For moves and reorders, use the semantic placement returned by discovery: `before`, `after`, `first`, or `last`. Read the ticket and destination board before moving, then read them again afterward. Do not edit MongoDB or another datastore directly; all changes must pass through the KooyaHQ CLI API.

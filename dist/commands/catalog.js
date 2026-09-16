@@ -4,6 +4,7 @@ import { authCommands } from './auth/specs.js';
 import { boardCommands } from './boards/specs.js';
 import { chatCommands } from './chat/specs.js';
 import { documentationCommands } from './documentation/specs.js';
+import { eventCommands } from './events/specs.js';
 import { kooyapediaCommands } from './kooyapedia/specs.js';
 import { meetCommands } from './meet/specs.js';
 import { notificationCommands } from './notifications/specs.js';
@@ -23,6 +24,7 @@ export const commandCatalog = [
     ...analyticsCommands,
     ...userCommands,
     ...notificationCommands,
+    ...eventCommands,
     ...announcementCommands,
     ...presenceCommands,
     ...settingsCommands,
