@@ -100,6 +100,10 @@ function commandHelp(command) {
         options.push('  --stdin                 Read bounded import input from standard input (exclusive with --file).');
         options.push('  --format <json|csv>     Override file-extension format detection.');
     }
+    for (const file of command.multipartFiles ?? []) {
+        const required = file.required ? ' (required)' : ' (optional)';
+        options.push(`  --${file.flag} <path>        Multipart file for field ${file.fieldName}${required}.`);
+    }
     options.push('  --help                 Show this help without reading configuration.');
     const groups = [
         ...(command.exactlyOne ?? []).map((group) => `  Exactly one: ${group.map(flag).join(', ')}`),

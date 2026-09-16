@@ -97,6 +97,9 @@ function commandSkillMarkdown(command) {
         options.push('- `--file <path>` or `--stdin` (exactly one): Read bounded import input.');
         options.push('- `--format <json|csv>`: Override file-extension format detection.');
     }
+    for (const file of command.multipartFiles ?? []) {
+        options.push(`- \`--${file.flag} <path>\`: Multipart upload for \`${file.fieldName}\`${file.required ? ' (required)' : ''}.`);
+    }
     const relationships = [
         ...(command.exactlyOne ?? []).map((group) => `- Exactly one of: ${group.map(flagName).join(', ')}.`),
         ...(command.atLeastOne ?? []).map((group) => `- At least one of: ${group.map(flagName).join(', ')}.`),
@@ -175,6 +178,17 @@ function commandSkillDocument(command) {
             required: false,
             choices: ['json', 'csv'],
             description: optionDescription('format', 'input'),
+        });
+    }
+    for (const file of command.multipartFiles ?? []) {
+        parameters.push({
+            name: file.flag,
+            location: 'input',
+            type: 'string',
+            required: Boolean(file.required),
+            description: `Local file path uploaded as multipart field ${file.fieldName}.`,
+            maxBytes: file.maxBytes,
+            fieldName: file.fieldName,
         });
     }
     const exactlyOne = [

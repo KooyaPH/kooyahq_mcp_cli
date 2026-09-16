@@ -1,4 +1,4 @@
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ValueType =
   | 'string'
   | 'integer'
@@ -56,6 +56,14 @@ export interface FileInputSpec {
   maxItems: number;
 }
 
+/** Optional binary file path flags sent as multipart form fields (not ticket-import JSON). */
+export interface MultipartFileSpec {
+  flag: string;
+  fieldName: string;
+  maxBytes: number;
+  required?: boolean;
+}
+
 export interface ConditionalRequirement {
   option: string;
   requires: string;
@@ -101,6 +109,7 @@ export interface CommandSpec {
   confirmation?: string;
   timerEligibility?: TimerEligibility;
   fileInput?: FileInputSpec;
+  multipartFiles?: MultipartFileSpec[];
   dateRange?: DateRangeSpec | DateRangeSpec[];
   dateTimeRange?: DateTimeRangeSpec | DateTimeRangeSpec[];
   conditionalRequirements?: ConditionalRequirement[];
@@ -131,4 +140,5 @@ export interface CommandRequest {
     stdin: boolean;
     format: 'json' | 'csv';
   };
+  multipartFiles?: Array<MultipartFileSpec & { path: string }>;
 }

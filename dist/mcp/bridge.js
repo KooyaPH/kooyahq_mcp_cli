@@ -179,6 +179,12 @@ function buildMcpArgv(command, input) {
             continue;
         appendOption(argv, flag, definition, value);
     }
+    for (const file of command.multipartFiles ?? []) {
+        const value = args[file.flag];
+        if (value === undefined)
+            continue;
+        argv.push(`--${file.flag}`, stringifyScalar(value, file.flag));
+    }
     if (command.fileInput) {
         argv.push('--stdin', '--format', 'json');
     }
@@ -197,6 +203,7 @@ function validateMcpArguments(command, args) {
         ...Object.keys(command.body ?? {}),
         ...(command.positionals ?? []).map((positional) => positional.name),
         ...(command.fileInput ? ['input'] : []),
+        ...(command.multipartFiles ?? []).map((file) => file.flag),
     ]);
     for (const key of Object.keys(args)) {
         if (!allowed.has(key))
@@ -204,6 +211,11 @@ function validateMcpArguments(command, args) {
     }
     if (command.fileInput && args.input === undefined) {
         throw new ValidationError(`${command.name} requires args.input for MCP import input.`);
+    }
+    for (const file of command.multipartFiles ?? []) {
+        if (file.required && args[file.flag] === undefined) {
+            throw new ValidationError(`${command.name} requires args.${file.flag} as a local file path.`);
+        }
     }
 }
 function optionEntries(command) {

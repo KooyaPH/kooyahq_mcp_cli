@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { homedir } from 'node:os';
 
 import { commandCatalog } from '../commands/catalog.js';
@@ -9,7 +10,7 @@ import { clearConfig, readConfig, writeConfig } from '../config/store.js';
 import type { Credentials } from '../config/types.js';
 import { DEFAULT_BASE_URL, validateBaseUrl } from '../config/url.js';
 import { CliError, ConfigError, publicErrorMessage, ValidationError } from '../core/errors.js';
-import { ApiClient } from '../http/client.js';
+import { ApiClient, type MultipartFilePart } from '../http/client.js';
 import { readBoundedFile, readBoundedStdin } from '../input/read-bounded.js';
 import { parseTicketImport } from '../input/ticket-import.js';
 import { runMcpSetupCommand, type SetupOverrides } from '../mcp/setup/index.js';
@@ -87,6 +88,7 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
 
     const request = buildRequest(commandCatalog, argv);
     await materializeFileInput(request, dependencies);
+    const multipartFiles = await materializeMultipartFiles(request, dependencies);
     for (const warning of request.warnings ?? []) dependencies.output.stderr(`Warning: ${warning}`);
     if (request.dryRun) {
       dependencies.output.stdout(JSON.stringify({
@@ -94,6 +96,13 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
         path: request.path,
         query: request.query,
         ...(request.body === undefined ? {} : { body: request.body }),
+        ...(multipartFiles.length === 0 ? {} : {
+          multipartFiles: multipartFiles.map((file) => ({
+            fieldName: file.fieldName,
+            filename: file.filename,
+            bytes: file.bytes.byteLength,
+          })),
+        }),
       }, null, 2));
       return 0;
     }
@@ -112,6 +121,7 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
       : await client.request(request.method, request.path, {
         query: request.query,
         ...(request.body === undefined ? {} : { body: request.body }),
+        ...(multipartFiles.length === 0 ? {} : { multipartFiles }),
       });
     dependencies.output.stdout(formatOutput(result, request.output));
     return 0;
@@ -173,6 +183,23 @@ async function materializeFileInput(
     request.fileInput.maxItems,
   );
   request.body = { ...request.body, [request.fileInput.bodyName]: tickets };
+}
+
+async function materializeMultipartFiles(
+  request: CommandRequest,
+  dependencies: RuntimeDependencies,
+): Promise<MultipartFilePart[]> {
+  if (!request.multipartFiles?.length) return [];
+  const parts: MultipartFilePart[] = [];
+  for (const file of request.multipartFiles) {
+    const bytes = await dependencies.readInputFile(file.path, file.maxBytes);
+    parts.push({
+      fieldName: file.fieldName,
+      filename: basename(file.path) || file.fieldName,
+      bytes,
+    });
+  }
+  return parts;
 }
 
 async function requestAllPages(
