@@ -472,6 +472,22 @@ notifications mark-all-read
 
 Notifications are always scoped to the authenticated user. Lists are paginated and support `--unread-only true|false`.
 
+### Events
+
+```text
+events watch
+events poll
+events cursor
+```
+
+Permission-gated live HQ signals for the access-key owner (notifications, chat, tickets). Requires `cli:access` plus each channel’s read permission; unauthorized channels are omitted rather than rejecting the request.
+
+- `events cursor` — bootstrap the latest cursor.
+- `events poll --since CURSOR` — one-shot buffer read for MCP / `kooyahq_call` loops (`--output ndjson` prints one event object per line).
+- `events watch` — long-lived SSE side process; writes one JSON object per line (`cursor`, `channel`, `event`, `data`, `at`). Use `--channels notifications,chat,tickets` to narrow.
+
+Default channels when `--channels` is omitted: all three the key is permitted to subscribe to.
+
 ### Announcements
 
 ```text

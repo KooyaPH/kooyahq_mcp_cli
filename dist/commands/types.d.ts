@@ -103,7 +103,7 @@ export interface CommandSpec {
         fields?: string[];
     };
 }
-export type OutputFormat = 'table' | 'json' | 'raw';
+export type OutputFormat = 'table' | 'json' | 'raw' | 'ndjson';
 export interface CommandRequest {
     method: HttpMethod;
     path: string;

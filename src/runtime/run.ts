@@ -108,6 +108,9 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
     }
     const credentials = await resolveCredentials(dependencies);
     const client = createClient(credentials, dependencies);
+    if (request.path === '/events/stream') {
+      return await runEventsWatch(client, request, dependencies);
+    }
     await resolveTimerIfNeeded(request, client);
     if (request.confirmation) {
       const answer = (await dependencies.prompt(`${request.confirmation} [y/N]`)).trim().toLowerCase();
@@ -330,6 +333,38 @@ function createClient(credentials: Credentials, dependencies: RuntimeDependencie
     nodeVersion: process.versions.node,
     ...(dependencies.fetch ? { fetch: dependencies.fetch } : {}),
   });
+}
+
+async function runEventsWatch(
+  client: ApiClient,
+  request: CommandRequest,
+  dependencies: RuntimeDependencies,
+): Promise<number> {
+  if (request.output !== 'table' && request.output !== 'ndjson' && request.output !== 'raw') {
+    throw new ValidationError('events watch writes one JSON object per line; use --output ndjson.');
+  }
+  const controller = new AbortController();
+  const onSignal = () => controller.abort();
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  try {
+    await client.streamSse(
+      request.path,
+      { query: request.query },
+      (eventName, data) => {
+        if (eventName !== 'cli-event') return;
+        dependencies.output.stdout(JSON.stringify(data));
+      },
+      controller.signal,
+    );
+    return 0;
+  } catch (error) {
+    if (controller.signal.aborted) return 0;
+    throw error;
+  } finally {
+    process.removeListener('SIGINT', onSignal);
+    process.removeListener('SIGTERM', onSignal);
+  }
 }
 
 async function resolveTimerIfNeeded(request: CommandRequest, client: ApiClient): Promise<void> {

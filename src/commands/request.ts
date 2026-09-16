@@ -278,8 +278,8 @@ function parseOptions(
         throw new ValidationError('Option --output requires a value.');
       }
       if (inlineValue === undefined) index += 1;
-      if (value !== 'table' && value !== 'json' && value !== 'raw') {
-        throw new ValidationError('--output must be table, json, or raw.');
+      if (value !== 'table' && value !== 'json' && value !== 'raw' && value !== 'ndjson') {
+        throw new ValidationError('--output must be table, json, raw, or ndjson.');
       }
       output = value;
       continue;

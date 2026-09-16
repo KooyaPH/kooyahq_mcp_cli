@@ -34,6 +34,7 @@ export declare class ApiClient {
     private readonly maxResponseBytes;
     constructor(options: ApiClientOptions);
     request<T = unknown>(method: string, path: string, requestOptions?: RequestOptions): Promise<T>;
+    streamSse(path: string, requestOptions: RequestOptions, onEvent: (eventName: string, data: unknown) => void, signal?: AbortSignal): Promise<void>;
     private sendWithTimeout;
 }
 export declare function buildHttpsRequestOptions(url: URL, method: string, headers: Headers): HttpsRequestOptions;

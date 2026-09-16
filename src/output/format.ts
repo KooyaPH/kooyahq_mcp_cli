@@ -6,6 +6,10 @@ export function formatOutput(value: unknown, format: OutputFormat): string {
     return JSON.stringify(value ?? null);
   }
   if (format === 'json') return JSON.stringify(value ?? null, null, 2);
+  if (format === 'ndjson') {
+    const rows = extractNdjsonRows(value);
+    return rows.map((row) => JSON.stringify(row ?? null)).join('\n');
+  }
   if (value === undefined) return 'Success.';
   const rows = extractRows(value);
   if (rows.length === 0) return 'No results.';
@@ -24,6 +28,18 @@ export function formatOutput(value: unknown, format: OutputFormat): string {
     widths.map((width) => '-'.repeat(width)).join('  '),
     ...records.map(line),
   ].join('\n');
+}
+
+function extractNdjsonRows(value: unknown): unknown[] {
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const data = record.data;
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const nested = data as Record<string, unknown>;
+      if (Array.isArray(nested.events)) return nested.events;
+    }
+  }
+  return extractRows(value);
 }
 
 function extractRows(value: unknown): unknown[] {
