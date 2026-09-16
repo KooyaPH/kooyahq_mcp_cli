@@ -217,6 +217,11 @@ function buildMcpArgv(command: CommandSpec, input: McpCallInput): string[] {
     if (value === undefined) continue;
     appendOption(argv, flag, definition, value);
   }
+  for (const file of command.multipartFiles ?? []) {
+    const value = args[file.flag];
+    if (value === undefined) continue;
+    argv.push(`--${file.flag}`, stringifyScalar(value, file.flag));
+  }
   if (command.fileInput) {
     argv.push('--stdin', '--format', 'json');
   }
@@ -233,12 +238,18 @@ function validateMcpArguments(command: CommandSpec, args: Record<string, unknown
     ...Object.keys(command.body ?? {}),
     ...(command.positionals ?? []).map((positional) => positional.name),
     ...(command.fileInput ? ['input'] : []),
+    ...(command.multipartFiles ?? []).map((file) => file.flag),
   ]);
   for (const key of Object.keys(args)) {
     if (!allowed.has(key)) throw new ValidationError(`Unknown MCP argument ${key} for ${command.name}.`);
   }
   if (command.fileInput && args.input === undefined) {
     throw new ValidationError(`${command.name} requires args.input for MCP import input.`);
+  }
+  for (const file of command.multipartFiles ?? []) {
+    if (file.required && args[file.flag] === undefined) {
+      throw new ValidationError(`${command.name} requires args.${file.flag} as a local file path.`);
+    }
   }
 }
 

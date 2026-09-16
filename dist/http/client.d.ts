@@ -2,9 +2,17 @@ import type { RequestOptions as HttpsRequestOptions } from 'node:https';
 import type { Credentials } from '../config/types.js';
 export declare const API_ROOT = "/api/cli/v1";
 type QueryValue = string | number | boolean | string[] | undefined;
+export interface MultipartFilePart {
+    fieldName: string;
+    filename: string;
+    bytes: Uint8Array;
+    contentType?: string;
+}
 export interface RequestOptions {
     query?: Record<string, QueryValue>;
     body?: unknown;
+    /** When set, body fields and files are sent as multipart/form-data. */
+    multipartFiles?: MultipartFilePart[];
 }
 export interface ApiClientOptions extends Credentials {
     version: string;

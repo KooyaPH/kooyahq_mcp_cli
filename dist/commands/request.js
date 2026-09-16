@@ -14,7 +14,14 @@ export function buildRequest(catalog, argv) {
             format: { apiName: 'format', choices: ['json', 'csv'] },
         }
         : {};
-    const allowed = { ...command.pathParams, ...command.query, ...command.body, ...fileOptions };
+    const multipartOptions = Object.fromEntries((command.multipartFiles ?? []).map((file) => [file.flag, { apiName: file.flag }]));
+    const allowed = {
+        ...command.pathParams,
+        ...command.query,
+        ...command.body,
+        ...fileOptions,
+        ...multipartOptions,
+    };
     const parsed = parseOptions(optionTokens, allowed, Boolean(command.confirmation));
     if (parsed.all && (!command.query?.page || !command.query.limit)) {
         throw new ValidationError('--all is available only for paginated list commands.');
@@ -26,6 +33,11 @@ export function buildRequest(catalog, argv) {
         const sources = ['file', 'stdin'].filter((flag) => parsed.values[flag] !== undefined);
         if (sources.length !== 1) {
             throw new ValidationError(`${command.name} requires exactly one of --file or --stdin.`);
+        }
+    }
+    for (const file of command.multipartFiles ?? []) {
+        if (file.required && parsed.values[file.flag] === undefined) {
+            throw new ValidationError(`${command.name} requires --${file.flag}.`);
         }
     }
     const warnings = [];
@@ -148,6 +160,14 @@ export function buildRequest(catalog, argv) {
             stdin: parsed.values.stdin !== undefined,
             format: requestedFormat === 'csv' ? 'csv' : requestedFormat === 'json' ? 'json' : inferredFormat,
         };
+    }
+    if (command.multipartFiles?.length) {
+        const files = command.multipartFiles.flatMap((file) => {
+            const path = parsed.values[file.flag];
+            return path === undefined ? [] : [{ ...file, path }];
+        });
+        if (files.length > 0)
+            request.multipartFiles = files;
     }
     return request;
 }

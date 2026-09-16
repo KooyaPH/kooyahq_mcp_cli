@@ -17,6 +17,14 @@ const DOMAIN_WORKFLOWS = {
     analytics: 'Choose the analytics view, supply its documented date range when required, and optionally narrow time analytics to an authorized user.',
     users: 'List users before assigning work; management actions require the corresponding server-side user permission.',
     notifications: 'List the current user notifications, inspect unread count, then mark individual or all notifications read.',
+    announcements: 'List or read announcements, then create or update them when you have announcement write permission.',
+    presence: 'List current location presence snapshots; live presence updates are not available over CLI/MCP.',
+    settings: 'Read theme, preferences, or profile, then apply the smallest authorized personalization change.',
+    documentation: 'List documentation, create a link or upload a file, then pin, update, or delete as permitted.',
+    kooyapedia: 'Open home or search, then fetch a page slug when needed.',
+    posts: 'List feed posts, create or update content, then manage comments, reactions, and poll votes.',
+    chat: 'List conversations or contacts, send messages over HTTP, and poll unread counts; live sockets are out of scope.',
+    meet: 'List contacts or create a room token, then manage recordings and egress when recording permission allows.',
 };
 const VERB_SUMMARIES = {
     list: 'List',
@@ -58,6 +66,24 @@ const VERB_SUMMARIES = {
     projects: 'Get project',
     time: 'Get time',
     whoami: 'Show the authenticated user for',
+    'list-mine': 'List my',
+    'create-direct': 'Create a direct',
+    'create-group': 'Create a group',
+    'create-link': 'Create a link in',
+    'create-file': 'Upload a file to',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    vote: 'Vote on',
+    leave: 'Leave',
+    send: 'Send',
+    analysis: 'Get analysis for',
+    upload: 'Upload',
+    active: 'Get active',
+    home: 'Open home for',
+    suggest: 'Suggest',
+    read: 'Mark read for',
+    unread: 'Get unread for',
+    locations: 'List locations for',
 };
 export function commandDocumentation(command) {
     return {
@@ -113,6 +139,11 @@ export function commandExamples(command) {
     }
     if (command.fileInput)
         parts.push('--file', 'tickets.json');
+    for (const file of command.multipartFiles ?? []) {
+        if (file.required || selected.has(file.flag)) {
+            parts.push(`--${file.flag}`, sampleFor(file.flag, {}));
+        }
+    }
     const invocation = parts.join(' ');
     if (command.name === 'users permissions update') {
         return [`${invocation} --dry-run --output json`];

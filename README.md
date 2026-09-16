@@ -1,6 +1,6 @@
 # KooyaHQ CLI
 
-Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, and notifications. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
+Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, announcements, presence locations, settings, documentation, KooyaPedia, posts, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
 
 The package is not published to npmjs.com, and Node.js 18 or newer is required. Install the tagged GitHub release; backend authorization remains mandatory.
 
@@ -471,6 +471,124 @@ notifications mark-all-read
 ```
 
 Notifications are always scoped to the authenticated user. Lists are paginated and support `--unread-only true|false`.
+
+### Announcements
+
+```text
+announcements list
+announcements get
+announcements create
+announcements update
+announcements delete
+```
+
+### Presence
+
+```text
+presence locations list
+```
+
+Location snapshot only. Live presence sockets and updates are not available over CLI/MCP.
+
+### Settings and personalization
+
+```text
+settings theme get
+settings theme set
+settings theme mandatory set
+settings preferences get
+settings preferences set
+settings profile get
+settings profile update
+```
+
+Theme routes use `/settings/theme`. Preferences and profile use `/users/preferences` and `/users/profile`. Profile updates accept optional `--profile-pic` and `--banner` file paths as multipart uploads.
+
+### Documentation
+
+```text
+documentation list
+documentation create-link
+documentation create-file
+documentation update
+documentation delete
+documentation pin
+documentation unpin
+```
+
+`documentation create-file` requires `--file <path>` as a multipart upload.
+
+### KooyaPedia
+
+```text
+kooyapedia home
+kooyapedia search
+kooyapedia suggest
+kooyapedia pages list
+kooyapedia pages get
+```
+
+### Posts / KooyaFeed
+
+```text
+posts list
+posts list-mine
+posts create
+posts update
+posts delete
+posts poll vote
+posts comments list
+posts comments create
+posts comments update
+posts comments delete
+posts reactions list
+posts reactions add
+posts reactions remove
+```
+
+Create and update accept optional `--image` file paths. Delete is available on CLI/MCP and on the web API.
+
+### Chat
+
+```text
+chat conversations list
+chat conversations get
+chat conversations create-direct
+chat conversations create-group
+chat conversations update
+chat conversations members add
+chat conversations members remove
+chat conversations leave
+chat messages list
+chat messages send
+chat messages update
+chat messages delete
+chat conversations read
+chat conversations unread
+chat contacts list
+chat conversations archive
+chat conversations unarchive
+chat conversations delete
+```
+
+HTTP request/response only. Poll unread or list messages for updates; sockets, SSE, and `chat watch` are out of scope.
+
+### Meet
+
+```text
+meet contacts list
+meet token create
+meet recordings list
+meet recordings get
+meet recordings analysis
+meet recordings upload
+meet egress start
+meet egress stop
+meet egress status
+meet egress active
+```
+
+`meet recordings upload` requires `--file <path>` for the recording multipart field.
 
 ## Common flags and scripting
 

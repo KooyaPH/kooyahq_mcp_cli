@@ -14,9 +14,18 @@ const DEFAULT_RETRY_DELAY_MS = 250;
 
 type QueryValue = string | number | boolean | string[] | undefined;
 
+export interface MultipartFilePart {
+  fieldName: string;
+  filename: string;
+  bytes: Uint8Array;
+  contentType?: string;
+}
+
 export interface RequestOptions {
   query?: Record<string, QueryValue>;
   body?: unknown;
+  /** When set, body fields and files are sent as multipart/form-data. */
+  multipartFiles?: MultipartFilePart[];
 }
 
 export interface ApiClientOptions extends Credentials {
@@ -66,7 +75,23 @@ export class ApiClient {
       'user-agent': `${this.options.clientName ?? 'kooyahq-cli'}/${this.options.version} (${this.platform}; node/${this.nodeVersion})`,
     });
     const init: RequestInit = { method, headers, redirect: 'error' };
-    if (requestOptions.body !== undefined) {
+    if (requestOptions.multipartFiles?.length) {
+      const form = new FormData();
+      if (requestOptions.body && typeof requestOptions.body === 'object' && !Array.isArray(requestOptions.body)) {
+        for (const [key, value] of Object.entries(requestOptions.body as Record<string, unknown>)) {
+          if (value === undefined) continue;
+          form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+        }
+      }
+      for (const file of requestOptions.multipartFiles) {
+        form.append(
+          file.fieldName,
+          new Blob([Buffer.from(file.bytes)], { type: file.contentType ?? 'application/octet-stream' }),
+          file.filename,
+        );
+      }
+      init.body = form;
+    } else if (requestOptions.body !== undefined) {
       headers.set('content-type', 'application/json');
       init.body = JSON.stringify(requestOptions.body);
     }
@@ -112,7 +137,7 @@ export class ApiClient {
           controller.abort();
           reject(new NetworkError('Unable to reach KooyaHQ before the request timeout.'));
         }, this.timeoutMs);
-        const request = this.options.fetch
+        const request = this.options.fetch || init.body instanceof FormData
           ? this.fetchImplementation(url, init)
           : nodeNativeRequest(
             url,

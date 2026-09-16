@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { homedir } from 'node:os';
 import { commandCatalog } from '../commands/catalog.js';
 import { buildRequest } from '../commands/request.js';
@@ -55,6 +56,7 @@ export async function runCli(argv, dependencies) {
             return await runMcpSetup(argv.slice(1), dependencies);
         const request = buildRequest(commandCatalog, argv);
         await materializeFileInput(request, dependencies);
+        const multipartFiles = await materializeMultipartFiles(request, dependencies);
         for (const warning of request.warnings ?? [])
             dependencies.output.stderr(`Warning: ${warning}`);
         if (request.dryRun) {
@@ -63,6 +65,13 @@ export async function runCli(argv, dependencies) {
                 path: request.path,
                 query: request.query,
                 ...(request.body === undefined ? {} : { body: request.body }),
+                ...(multipartFiles.length === 0 ? {} : {
+                    multipartFiles: multipartFiles.map((file) => ({
+                        fieldName: file.fieldName,
+                        filename: file.filename,
+                        bytes: file.bytes.byteLength,
+                    })),
+                }),
             }, null, 2));
             return 0;
         }
@@ -81,6 +90,7 @@ export async function runCli(argv, dependencies) {
             : await client.request(request.method, request.path, {
                 query: request.query,
                 ...(request.body === undefined ? {} : { body: request.body }),
+                ...(multipartFiles.length === 0 ? {} : { multipartFiles }),
             });
         dependencies.output.stdout(formatOutput(result, request.output));
         return 0;
@@ -132,6 +142,20 @@ async function materializeFileInput(request, dependencies) {
         : await dependencies.readStandardInput(request.fileInput.maxBytes);
     const tickets = parseTicketImport(input, request.fileInput.format, request.fileInput.maxBytes, request.fileInput.maxItems);
     request.body = { ...request.body, [request.fileInput.bodyName]: tickets };
+}
+async function materializeMultipartFiles(request, dependencies) {
+    if (!request.multipartFiles?.length)
+        return [];
+    const parts = [];
+    for (const file of request.multipartFiles) {
+        const bytes = await dependencies.readInputFile(file.path, file.maxBytes);
+        parts.push({
+            fieldName: file.fieldName,
+            filename: basename(file.path) || file.fieldName,
+            bytes,
+        });
+    }
+    return parts;
 }
 async function requestAllPages(client, request, limits) {
     const requestedLimit = request.query.limit;
