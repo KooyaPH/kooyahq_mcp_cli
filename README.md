@@ -21,7 +21,7 @@ git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 hash -r
 kooyahq --version
 kooyahq --help
@@ -33,7 +33,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 hash -r
 kooyahq --version
 kooyahq --help
@@ -46,7 +46,7 @@ Install Node.js 18 or newer and Git for Windows, then run this in PowerShell:
 
 ```powershell
 git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
@@ -60,7 +60,7 @@ For a Git-based global upgrade, remove the current package before installing the
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 hash -r
 kooyahq --version
 ```
@@ -703,7 +703,7 @@ Revoke a compromised key in the user's KooyaHQ profile, remove it from CI/enviro
 - Codex reports `No such file or directory (os error 2)`: reinstall the package, run `kooyahq mcp install --client codex`, then restart Codex and open a new thread. The prior entry or global npm shim is stale or dangling.
 - Codex reports `Tools: none` or startup incomplete: run `kooyahq mcp doctor --client codex`. `Auth: Unsupported` by itself is expected for this local stdio server because KooyaHQ uses its saved API credential profile rather than MCP OAuth.
 - `tsc: not found` during installation: fetch the current `main` and reinstall. Supported GitHub installs use committed `dist/` files and do not compile TypeScript.
-- SSH or repository error: verify `ssh -T git@github.com` and `git ls-remote git@github.com:KooyaPH/kooyahq_cli.git`.
+- SSH or repository error: verify `git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git` (or SSH equivalent `git@github.com:KooyaPH/kooyahq_mcp_cli.git`).
 - `KooyaHQ is not configured`: run `kooyahq configure` or provide all three environment variables.
 - Exit `3`: the key is invalid, revoked, expired, or copied incorrectly.
 - Exit `4`: the acting user lacks the required backend permission or resource membership.

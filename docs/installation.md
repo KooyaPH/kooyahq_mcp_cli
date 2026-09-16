@@ -1,20 +1,19 @@
 # KooyaHQ CLI installation
 
-KooyaHQ CLI is a private GitHub package. It requires Node.js 18 or newer, npm, Git, SSH access to GitHub, and read access to `KooyaPH/kooyahq_cli`.
+KooyaHQ CLI is a public GitHub package for controlled distribution. It requires Node.js 18 or newer, npm, and Git. Access to KooyaHQ data still requires an authorized account and CLI key.
 
 ## Shared prerequisites
 
-On every platform, use Node.js 18 or newer, npm, Git, SSH access to GitHub, and read access to `KooyaPH/kooyahq_cli`. Verify access before installation:
+On every platform, use Node.js 18 or newer, npm, and Git. Verify the public repository before installation:
 
 ```sh
-ssh -T git@github.com
-git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
+git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
 ```
 
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 hash -r
 kooyahq --version
 kooyahq-mcp --version
@@ -25,7 +24,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 hash -r
 kooyahq --version
 kooyahq-mcp --version
@@ -36,9 +35,8 @@ kooyahq-mcp --version
 Install Node.js 18 or newer and Git for Windows. In PowerShell, run:
 
 ```powershell
-ssh -T git@github.com
-git ls-remote git@github.com:KooyaPH/kooyahq_cli.git
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 kooyahq --version
 kooyahq-mcp --version
 ```
@@ -51,7 +49,7 @@ For a Git-based global upgrade, remove the current package before installing the
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.1.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
 hash -r
 kooyahq --version
 ```
