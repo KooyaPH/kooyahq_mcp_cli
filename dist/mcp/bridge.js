@@ -186,7 +186,9 @@ function buildMcpArgv(command, input) {
         const value = args[file.flag];
         if (value === undefined)
             continue;
-        argv.push(`--${file.flag}`, stringifyScalar(value, file.flag));
+        const values = file.repeatable && Array.isArray(value) ? value : [value];
+        for (const path of values)
+            argv.push(`--${file.flag}`, stringifyScalar(path, file.flag));
     }
     if (command.fileInput) {
         argv.push('--stdin', '--format', 'json');
@@ -216,8 +218,21 @@ function validateMcpArguments(command, args) {
         throw new ValidationError(`${command.name} requires args.input for MCP import input.`);
     }
     for (const file of command.multipartFiles ?? []) {
-        if (file.required && args[file.flag] === undefined) {
+        const value = args[file.flag];
+        if (file.required && value === undefined) {
             throw new ValidationError(`${command.name} requires args.${file.flag} as a local file path.`);
+        }
+        if (value === undefined)
+            continue;
+        const paths = file.repeatable && Array.isArray(value) ? value : [value];
+        if (!paths.every((path) => typeof path === 'string' && path.length > 0)) {
+            throw new ValidationError(`MCP argument ${file.flag} must contain local file paths.`);
+        }
+        if (file.maxItems !== undefined && paths.length > file.maxItems) {
+            throw new ValidationError(`MCP argument ${file.flag} accepts at most ${file.maxItems} files.`);
+        }
+        if (!file.repeatable && Array.isArray(value)) {
+            throw new ValidationError(`MCP argument ${file.flag} must be one local file path.`);
         }
     }
 }

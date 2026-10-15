@@ -9,6 +9,7 @@ import type {
 
 interface ParsedOptions {
   values: Record<string, string>;
+  repeatedValues: Record<string, string[]>;
   yes: boolean;
   output: OutputFormat;
   dryRun: boolean;
@@ -42,7 +43,12 @@ export function buildRequest(catalog: CommandSpec[], argv: string[]): CommandReq
     ...fileOptions,
     ...multipartOptions,
   };
-  const parsed = parseOptions(optionTokens, allowed, Boolean(command.confirmation));
+  const parsed = parseOptions(
+    optionTokens,
+    allowed,
+    Boolean(command.confirmation),
+    new Set((command.multipartFiles ?? []).filter((file) => file.repeatable).map((file) => file.flag)),
+  );
   if (parsed.all && (!command.query?.page || !command.query.limit)) {
     throw new ValidationError('--all is available only for paginated list commands.');
   }
@@ -56,8 +62,14 @@ export function buildRequest(catalog: CommandSpec[], argv: string[]): CommandReq
     }
   }
   for (const file of command.multipartFiles ?? []) {
-    if (file.required && parsed.values[file.flag] === undefined) {
+    const paths = file.repeatable
+      ? parsed.repeatedValues[file.flag] ?? []
+      : parsed.values[file.flag] === undefined ? [] : [parsed.values[file.flag]!];
+    if (file.required && paths.length === 0) {
       throw new ValidationError(`${command.name} requires --${file.flag}.`);
+    }
+    if (file.maxItems !== undefined && paths.length > file.maxItems) {
+      throw new ValidationError(`--${file.flag} accepts at most ${file.maxItems} files.`);
     }
   }
   const warnings: string[] = [];
@@ -80,7 +92,7 @@ export function buildRequest(catalog: CommandSpec[], argv: string[]): CommandReq
     }
   }
   for (const group of command.atLeastOne ?? []) {
-    const supplied = group.filter((flag) => parsed.values[flag] !== undefined);
+    const supplied = group.filter((flag) => parsed.values[flag] !== undefined || (parsed.repeatedValues[flag]?.length ?? 0) > 0);
     if (supplied.length === 0) {
       throw new ValidationError(`${command.name} requires at least one of ${formatFlags(group)}.`);
     }
@@ -192,8 +204,10 @@ export function buildRequest(catalog: CommandSpec[], argv: string[]): CommandReq
   }
   if (command.multipartFiles?.length) {
     const files = command.multipartFiles.flatMap((file) => {
-      const path = parsed.values[file.flag];
-      return path === undefined ? [] : [{ ...file, path }];
+      const paths = file.repeatable
+        ? parsed.repeatedValues[file.flag] ?? []
+        : parsed.values[file.flag] === undefined ? [] : [parsed.values[file.flag]!];
+      return paths.map((path) => ({ ...file, path }));
     });
     if (files.length > 0) request.multipartFiles = files;
   }
@@ -237,8 +251,10 @@ function parseOptions(
   tokens: string[],
   allowed: Record<string, OptionSpec>,
   allowYes: boolean,
+  repeatableOptions: Set<string> = new Set(),
 ): ParsedOptions {
   const values: Record<string, string> = {};
+  const repeatedValues: Record<string, string[]> = {};
   let yes = false;
   let output: OutputFormat = 'table';
   let dryRun = false;
@@ -252,7 +268,7 @@ function parseOptions(
     const rawName = equalsIndex === -1 ? option : option.slice(0, equalsIndex);
     const inlineValue = equalsIndex === -1 ? undefined : option.slice(equalsIndex + 1);
     if (!rawName) throw new ValidationError('Option name must not be blank.');
-    if (suppliedOptions.has(rawName)) {
+    if (suppliedOptions.has(rawName) && !repeatableOptions.has(rawName)) {
       throw new ValidationError(`Option --${rawName} must not be repeated.`);
     }
     suppliedOptions.add(rawName);
@@ -296,10 +312,15 @@ function parseOptions(
       throw new ValidationError(`Option --${rawName} requires a value.`);
     }
     if (inlineValue === undefined) index += 1;
-    values[rawName] = value;
+    if (repeatableOptions.has(rawName)) {
+      repeatedValues[rawName] ??= [];
+      repeatedValues[rawName]!.push(value);
+    } else {
+      values[rawName] = value;
+    }
   }
 
-  return { values, yes, output, dryRun, all };
+  return { values, repeatedValues, yes, output, dryRun, all };
 }
 
 function mapOptions(

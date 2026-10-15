@@ -964,6 +964,25 @@ test('maps post content format and keeps mention tokens verbatim', () => {
   ]).body, { content });
 });
 
+test('accepts repeatable Feed attachment paths for posts and comments', () => {
+  const post = buildRequest(commandCatalog, [
+    'posts', 'create', '--content', 'Demo', '--attachment', './clip.mp4', '--attachment', './notes.pdf',
+  ]);
+  assert.deepEqual(post.multipartFiles?.map((file) => ({ fieldName: file.fieldName, path: file.path })), [
+    { fieldName: 'attachments', path: './clip.mp4' },
+    { fieldName: 'attachments', path: './notes.pdf' },
+  ]);
+
+  const comment = buildRequest(commandCatalog, [
+    'posts', 'comments', 'create', '--post-id', '507f1f77bcf86cd799439011', '--attachment', './image.png',
+  ]);
+  assert.equal(comment.body, undefined);
+  assert.equal(comment.multipartFiles?.[0]?.fieldName, 'attachments');
+  assert.throws(() => buildRequest(commandCatalog, [
+    'posts', 'create', ...Array.from({ length: 21 }, (_, index) => ['--attachment', `./${index}.png`]).flat(),
+  ]), /at most 20 files/);
+});
+
 test('maps AI News list, create, and delete to the CLI API', () => {
   assert.deepEqual(buildRequest(commandCatalog, [
     'ai-news', 'list', '--filter', 'custom', '--limit', '20', '--offset', '0',

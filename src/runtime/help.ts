@@ -134,7 +134,8 @@ function commandHelp(command: CommandSpec): string {
   }
   for (const file of command.multipartFiles ?? []) {
     const required = file.required ? ' (required)' : ' (optional)';
-    options.push(`  --${file.flag} <path>        Multipart file for field ${file.fieldName}${required}.`);
+    const repeatable = file.repeatable ? ` (repeatable${file.maxItems ? ` up to ${file.maxItems}` : ''})` : '';
+    options.push(`  --${file.flag} <path>        Multipart file for field ${file.fieldName}${required}${repeatable}.`);
   }
   options.push('  --help                 Show this help without reading configuration.');
 

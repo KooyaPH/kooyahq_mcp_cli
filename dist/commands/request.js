@@ -22,7 +22,7 @@ export function buildRequest(catalog, argv) {
         ...fileOptions,
         ...multipartOptions,
     };
-    const parsed = parseOptions(optionTokens, allowed, Boolean(command.confirmation));
+    const parsed = parseOptions(optionTokens, allowed, Boolean(command.confirmation), new Set((command.multipartFiles ?? []).filter((file) => file.repeatable).map((file) => file.flag)));
     if (parsed.all && (!command.query?.page || !command.query.limit)) {
         throw new ValidationError('--all is available only for paginated list commands.');
     }
@@ -36,8 +36,14 @@ export function buildRequest(catalog, argv) {
         }
     }
     for (const file of command.multipartFiles ?? []) {
-        if (file.required && parsed.values[file.flag] === undefined) {
+        const paths = file.repeatable
+            ? parsed.repeatedValues[file.flag] ?? []
+            : parsed.values[file.flag] === undefined ? [] : [parsed.values[file.flag]];
+        if (file.required && paths.length === 0) {
             throw new ValidationError(`${command.name} requires --${file.flag}.`);
+        }
+        if (file.maxItems !== undefined && paths.length > file.maxItems) {
+            throw new ValidationError(`--${file.flag} accepts at most ${file.maxItems} files.`);
         }
     }
     const warnings = [];
@@ -59,7 +65,7 @@ export function buildRequest(catalog, argv) {
         }
     }
     for (const group of command.atLeastOne ?? []) {
-        const supplied = group.filter((flag) => parsed.values[flag] !== undefined);
+        const supplied = group.filter((flag) => parsed.values[flag] !== undefined || (parsed.repeatedValues[flag]?.length ?? 0) > 0);
         if (supplied.length === 0) {
             throw new ValidationError(`${command.name} requires at least one of ${formatFlags(group)}.`);
         }
@@ -163,8 +169,10 @@ export function buildRequest(catalog, argv) {
     }
     if (command.multipartFiles?.length) {
         const files = command.multipartFiles.flatMap((file) => {
-            const path = parsed.values[file.flag];
-            return path === undefined ? [] : [{ ...file, path }];
+            const paths = file.repeatable
+                ? parsed.repeatedValues[file.flag] ?? []
+                : parsed.values[file.flag] === undefined ? [] : [parsed.values[file.flag]];
+            return paths.map((path) => ({ ...file, path }));
         });
         if (files.length > 0)
             request.multipartFiles = files;
@@ -198,8 +206,9 @@ function bindPositionals(command, tokens) {
     });
     return values;
 }
-function parseOptions(tokens, allowed, allowYes) {
+function parseOptions(tokens, allowed, allowYes, repeatableOptions = new Set()) {
     const values = {};
+    const repeatedValues = {};
     let yes = false;
     let output = 'table';
     let dryRun = false;
@@ -215,7 +224,7 @@ function parseOptions(tokens, allowed, allowYes) {
         const inlineValue = equalsIndex === -1 ? undefined : option.slice(equalsIndex + 1);
         if (!rawName)
             throw new ValidationError('Option name must not be blank.');
-        if (suppliedOptions.has(rawName)) {
+        if (suppliedOptions.has(rawName) && !repeatableOptions.has(rawName)) {
             throw new ValidationError(`Option --${rawName} must not be repeated.`);
         }
         suppliedOptions.add(rawName);
@@ -267,9 +276,15 @@ function parseOptions(tokens, allowed, allowYes) {
         }
         if (inlineValue === undefined)
             index += 1;
-        values[rawName] = value;
+        if (repeatableOptions.has(rawName)) {
+            repeatedValues[rawName] ??= [];
+            repeatedValues[rawName].push(value);
+        }
+        else {
+            values[rawName] = value;
+        }
     }
-    return { values, yes, output, dryRun, all };
+    return { values, repeatedValues, yes, output, dryRun, all };
 }
 function mapOptions(values, definitions) {
     const result = {};
