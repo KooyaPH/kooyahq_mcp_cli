@@ -56,6 +56,39 @@ test('MCP discovery returns existing command skill schema without credentials or
   assert.equal((result as { schemaVersion: number }).schemaVersion, 2);
 });
 
+test('MCP Feed discovery and dry run expose repeatable local attachment paths', async () => {
+  const discovery = await callMcpTool('kooyahq_discover', { scope: 'posts comments create' }, dependencies());
+  const parameters = (discovery as { parameters: Array<{ name: string; repeatable?: boolean; maxItems?: number }> }).parameters;
+  assert.deepEqual(parameters.find((parameter) => parameter.name === 'attachment'), {
+    name: 'attachment',
+    location: 'input',
+    type: 'string',
+    required: false,
+    description: 'Local file path uploaded as multipart field attachments.',
+    maxBytes: 104857600,
+    fieldName: 'attachments',
+    repeatable: true,
+    maxItems: 20,
+  });
+
+  const result = await callMcpTool('kooyahq_call', {
+    command: 'posts comments create',
+    project: 'KooyaHQ',
+    confirm: true,
+    dryRun: true,
+    args: {
+      'post-id': '507f1f77bcf86cd799439011',
+      attachment: ['/tmp/photo.png', '/tmp/brief.pdf'],
+    },
+  }, dependencies({
+    readInputFile: async (path) => new TextEncoder().encode(path),
+  }));
+  assert.deepEqual((result as { multipartFiles: Array<{ fieldName: string; filename: string; bytes: number }> }).multipartFiles, [
+    { fieldName: 'attachments', filename: 'photo.png', bytes: 14 },
+    { fieldName: 'attachments', filename: 'brief.pdf', bytes: 14 },
+  ]);
+});
+
 test('MCP status refuses missing configuration before network traffic', async () => {
   let networkCalls = 0;
   await assert.rejects(

@@ -119,7 +119,7 @@ function commandSkillMarkdown(command: CommandSpec): string {
   }
   for (const file of command.multipartFiles ?? []) {
     options.push(
-      `- \`--${file.flag} <path>\`: Multipart upload for \`${file.fieldName}\`${file.required ? ' (required)' : ''}.`,
+      `- \`--${file.flag} <path>\`: Multipart upload for \`${file.fieldName}\`${file.required ? ' (required)' : ''}${file.repeatable ? `; repeatable up to ${file.maxItems ?? 'the command limit'}` : ''}.`,
     );
   }
 
@@ -227,6 +227,7 @@ function commandSkillDocument(command: CommandSpec): Record<string, unknown> {
       description: `Local file path uploaded as multipart field ${file.fieldName}.`,
       maxBytes: file.maxBytes,
       fieldName: file.fieldName,
+      ...(file.repeatable ? { repeatable: true, maxItems: file.maxItems } : {}),
     });
   }
   const exactlyOne = [

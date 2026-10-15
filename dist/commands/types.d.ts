@@ -51,6 +51,8 @@ export interface MultipartFileSpec {
     fieldName: string;
     maxBytes: number;
     required?: boolean;
+    repeatable?: boolean;
+    maxItems?: number;
 }
 export interface ConditionalRequirement {
     option: string;

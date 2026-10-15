@@ -1,6 +1,8 @@
 import { listQuery } from '../shared.js';
 const IMAGE_MAX = 5 * 1024 * 1024;
-const MENTION_HELP = 'Mention users with @[Name](userId); get user IDs from `kooyahq users list`.';
+const FEED_ATTACHMENT_MAX = 100 * 1024 * 1024;
+const FEED_ATTACHMENTS = { flag: 'attachment', fieldName: 'attachments', maxBytes: FEED_ATTACHMENT_MAX, repeatable: true, maxItems: 20 };
+const MENTION_HELP = 'Mention users with @[Name](userId); find a person by name or email with `kooyahq users list --search <query> --all --output json`.';
 const POST_CONTENT = {
     apiName: 'content',
     maxLength: 50_000,
@@ -62,8 +64,8 @@ export const postCommands = [
                 example: '{"question":"Ship Friday?","options":["Yes","No"]}',
             },
         },
-        multipartFiles: [{ flag: 'image', fieldName: 'image', maxBytes: IMAGE_MAX }],
-        atLeastOne: [['content', 'image', 'poll']],
+        multipartFiles: [{ flag: 'image', fieldName: 'image', maxBytes: IMAGE_MAX }, FEED_ATTACHMENTS],
+        atLeastOne: [['content', 'image', 'poll', 'attachment']],
     },
     {
         name: 'posts update',
@@ -78,8 +80,8 @@ export const postCommands = [
             tags: { apiName: 'tags', type: 'csv', maxItems: 20, itemMaxLength: 50 },
             draft: { apiName: 'draft', type: 'boolean' },
         },
-        multipartFiles: [{ flag: 'image', fieldName: 'image', maxBytes: IMAGE_MAX }],
-        atLeastOne: [['content', 'category', 'tags', 'draft', 'image']],
+        multipartFiles: [{ flag: 'image', fieldName: 'image', maxBytes: IMAGE_MAX }, FEED_ATTACHMENTS],
+        atLeastOne: [['content', 'category', 'tags', 'draft', 'image', 'attachment']],
     },
     {
         name: 'posts delete',
@@ -112,20 +114,24 @@ export const postCommands = [
         method: 'POST',
         path: '/posts/:postId/comments',
         pathParams: { 'post-id': { apiName: 'postId', format: 'object-id' } },
-        requiredOptions: ['post-id', 'content'],
+        requiredOptions: ['post-id'],
         body: {
             content: COMMENT_CONTENT,
         },
+        multipartFiles: [FEED_ATTACHMENTS],
+        atLeastOne: [['content', 'attachment']],
     },
     {
         name: 'posts comments update',
         method: 'PUT',
         path: '/posts/comments/:commentId',
         pathParams: { 'comment-id': { apiName: 'commentId', format: 'object-id' } },
-        requiredOptions: ['comment-id', 'content'],
+        requiredOptions: ['comment-id'],
         body: {
             content: COMMENT_CONTENT,
         },
+        multipartFiles: [FEED_ATTACHMENTS],
+        atLeastOne: [['content', 'attachment']],
     },
     {
         name: 'posts comments delete',

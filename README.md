@@ -21,7 +21,7 @@ git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.1
 hash -r
 kooyahq --version
 kooyahq --help
@@ -33,7 +33,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.1
 hash -r
 kooyahq --version
 kooyahq --help
@@ -46,7 +46,7 @@ Install Node.js 18 or newer and Git for Windows, then run this in PowerShell:
 
 ```powershell
 git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.1
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
@@ -72,7 +72,7 @@ For a manual Git-based global upgrade, remove the current package before install
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.1
 hash -r
 kooyahq --version
 ```
@@ -583,16 +583,21 @@ posts reactions add
 posts reactions remove
 ```
 
-Create and update accept optional `--image` file paths. Delete is available on CLI/MCP and on the web API.
+Create and update accept the legacy `--image` path and repeatable `--attachment` paths (up to 20) for photos, GIFs, video, audio, and common documents. Comment create/update also accept repeatable `--attachment` paths. Delete is available on CLI/MCP and on the web API.
 
 `--format markdown|text` sets how `--content` is rendered: `markdown`, or plain `text` with line breaks kept. Without it the backend keeps its default behavior. Comments are always plain text.
 
-Mention users in post content and comments with the token `@[Name](userId)`. Get user IDs from `kooyahq users list`; unknown IDs are ignored. Mentioned users are notified.
+Mention users in post content and comments with the token `@[Name](userId)`. Search the user directory by name or email with `kooyahq users list --search <query> --all --output json`, then copy the matching user's `id`; unknown IDs are ignored. Mentioned users are notified. The same `@[Name](userId)` token works in CLI commands and MCP `kooyahq_call` arguments.
 
 ```sh
 kooyahq posts create --format markdown --content '**Shipped** the release, thanks @[Jane Doe](507f1f77bcf86cd799439015)'
+kooyahq posts create --content 'Demo files' --attachment ./demo.mp4 --attachment ./notes.pdf
 kooyahq posts comments create --post-id 507f1f77bcf86cd799439011 --content 'Nice work @[Jane Doe](507f1f77bcf86cd799439015)'
+kooyahq posts comments create --post-id 507f1f77bcf86cd799439011 --attachment ./screenshot.png
+kooyahq users list --search jane@example.com --all --output json
 ```
+
+MCP calls use `args.attachment` as an array of local file paths for repeatable uploads. The backend validates media types and per-kind size limits and stores Feed uploads under the authenticated author's Feed path.
 
 ### AI News
 
