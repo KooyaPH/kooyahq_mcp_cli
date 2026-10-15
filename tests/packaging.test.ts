@@ -207,6 +207,7 @@ test('README documents permission-gated events and steers chat live signals to e
 test('CI builds dist, smoke-tests Linux, macOS, and Windows, and releases from main', () => {
   assert.equal((workflow.match(/node scripts\/verify-dist\.mjs/g) ?? []).length, 1);
   assert.match(workflow, /auto_release:[\s\S]*runs-on: ubuntu-latest[\s\S]*contents: write/);
+  assert.match(workflow, /auto_release:[\s\S]*if: \$\{\{ !cancelled\(\) && needs\.required\.result == 'success'/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /github\.actor != 'github-actions\[bot\]'/);
   assert.match(workflow, /\[skip ci\]/);

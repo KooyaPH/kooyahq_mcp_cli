@@ -135,7 +135,8 @@ jobs:
     name: Commit dist and release
     needs: [required]
     # GITHUB_TOKEN pushes never start workflows; the actor check and [skip ci] are extra loop guards.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]' }}
+    # The implicit success() is false when the optional cross-platform-smoke ancestor is skipped.
+    if: ${{ !cancelled() && needs.required.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
