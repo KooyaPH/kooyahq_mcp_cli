@@ -204,8 +204,13 @@ test('README documents permission-gated events and steers chat live signals to e
   assert.doesNotMatch(readme, /sockets, SSE, and `chat watch` are out of scope/);
 });
 
-test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () => {
-  assert.match(workflow, /node scripts\/verify-dist\.mjs/);
+test('CI builds dist, smoke-tests Linux, macOS, and Windows, and releases from main', () => {
+  assert.equal((workflow.match(/node scripts\/verify-dist\.mjs/g) ?? []).length, 1);
+  assert.match(workflow, /auto_release:[\s\S]*runs-on: self-hosted[\s\S]*contents: write/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /github\.actor != 'github-actions\[bot\]'/);
+  assert.match(workflow, /\[skip ci\]/);
+  assert.match(workflow, /git ls-remote --exit-code --tags origin/);
   assert.ok(existsSync('scripts/verify-dist.mjs'));
   assert.match(workflow, /ubuntu-latest/);
   assert.match(workflow, /macos-latest/);
@@ -216,7 +221,7 @@ test('CI verifies committed dist and smoke-tests Linux, macOS, and Windows', () 
   assert.match(workflow, /kooyahq-mcp\.js/);
   assert.match(workflow, /node scripts\/smoke-mcp\.mjs/);
   assert.match(workflow, /node scripts\/smoke-git-install\.mjs/);
-  assert.equal((workflow.match(/node scripts\/smoke-git-install\.mjs/g) ?? []).length, 2);
+  assert.equal((workflow.match(/node scripts\/smoke-git-install\.mjs/g) ?? []).length, 3);
   assert.match(gitInstallSmoke, /--global/);
   assert.match(gitInstallSmoke, /--install-links=true/);
   assert.match(gitInstallSmoke, /--ignore-scripts/);
