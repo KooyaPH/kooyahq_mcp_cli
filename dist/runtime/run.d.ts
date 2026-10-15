@@ -1,4 +1,5 @@
 import { type SetupOverrides } from '../mcp/setup/index.js';
+import { type UpdateOverrides } from './update.js';
 export interface RuntimeDependencies {
     environment: NodeJS.ProcessEnv;
     homeDirectory: string;
@@ -11,6 +12,7 @@ export interface RuntimeDependencies {
     readStandardInput: (maxBytes: number) => Promise<Uint8Array>;
     allPagesLimits?: AllPagesLimits;
     mcpSetup?: SetupOverrides;
+    update?: UpdateOverrides;
     output: {
         stdout: (value: string) => void;
         stderr: (value: string) => void;

@@ -2,6 +2,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ValueType = 'string' | 'integer' | 'number' | 'boolean' | 'switch' | 'csv' | 'singleton' | 'json-object' | 'json-array';
 export interface OptionSpec {
     apiName: string;
+    description?: string;
     type?: ValueType;
     choices?: string[];
     itemChoices?: string[];

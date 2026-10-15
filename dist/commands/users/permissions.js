@@ -25,6 +25,8 @@ export const USER_PERMISSION_CHOICES = [
     'ai-news:fullAccess',
     'ai-news:read',
     'ai-news:refresh',
+    'ai-news:create',
+    'ai-news:delete',
     'gallery:fullAccess',
     'gallery:read',
     'gallery:create',

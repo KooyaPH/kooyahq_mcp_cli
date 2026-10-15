@@ -242,7 +242,7 @@ function parameterDocuments(command, definitions, location) {
         name,
         location,
         type: definition.type ?? 'string',
-        description: optionDescription(name, location),
+        description: definition.description ?? optionDescription(name, location),
         required: Boolean(command.requiredOptions?.includes(name)),
         requiredDirectly: Boolean(command.requiredOptions?.includes(name)),
         requiredByExactlyOneGroup: Boolean(command.exactlyOne?.some((group) => group.includes(name))),
@@ -311,7 +311,7 @@ function skillOption(flag, definition, required, oneOf) {
     const requirement = required ? 'required' : oneOf ? 'required group' : 'optional';
     const constraints = optionConstraints(definition);
     const details = [requirement, ...constraints].join('; ');
-    return `- \`--${flag}${value ? ` ${value}` : ''}\`: ${optionDescription(flag, 'body')} ${details}.`;
+    return `- \`--${flag}${value ? ` ${value}` : ''}\`: ${definition.description ?? optionDescription(flag, 'body')} ${details}.`;
 }
 function flagName(value) {
     return `\`--${value}\``;

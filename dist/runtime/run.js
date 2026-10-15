@@ -14,6 +14,7 @@ import { runMcpSetupCommand } from '../mcp/setup/index.js';
 import { formatOutput } from '../output/format.js';
 import { helpText } from './help.js';
 import { skillOutput } from './skill.js';
+import { runUpdate } from './update.js';
 const DEFAULT_ALL_PAGES_LIMITS = {
     maxPages: 100,
     maxItems: 100_000,
@@ -54,6 +55,12 @@ export async function runCli(argv, dependencies) {
             return await runConfigure(argv.slice(1), dependencies);
         if (argv[0] === 'mcp')
             return await runMcpSetup(argv.slice(1), dependencies);
+        if (argv[0] === 'update') {
+            return await runUpdate(argv.slice(1), {
+                ...dependencies,
+                ...(dependencies.update ? { overrides: dependencies.update } : {}),
+            });
+        }
         const request = buildRequest(commandCatalog, argv);
         await materializeFileInput(request, dependencies);
         const multipartFiles = await materializeMultipartFiles(request, dependencies);
