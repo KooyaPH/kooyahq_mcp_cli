@@ -1,7 +1,23 @@
 import { listQuery } from '../shared.js';
-import type { CommandSpec } from '../types.js';
+import type { CommandSpec, OptionSpec } from '../types.js';
 
 const IMAGE_MAX = 5 * 1024 * 1024;
+const MENTION_HELP = 'Mention users with @[Name](userId); get user IDs from `kooyahq users list`.';
+const POST_CONTENT: OptionSpec = {
+  apiName: 'content',
+  maxLength: 50_000,
+  description: `Post body, interpreted by --format. ${MENTION_HELP}`,
+};
+const POST_FORMAT: OptionSpec = {
+  apiName: 'format',
+  choices: ['markdown', 'text'],
+  description: 'How --content is rendered: markdown, or plain text with line breaks kept.',
+};
+const COMMENT_CONTENT: OptionSpec = {
+  apiName: 'content',
+  maxLength: 10_000,
+  description: `Plain-text comment. ${MENTION_HELP}`,
+};
 
 export const postCommands: CommandSpec[] = [
   {
@@ -24,7 +40,8 @@ export const postCommands: CommandSpec[] = [
     method: 'POST',
     path: '/posts',
     body: {
-      content: { apiName: 'content', maxLength: 50_000 },
+      content: POST_CONTENT,
+      format: POST_FORMAT,
       category: { apiName: 'category', maxLength: 100 },
       tags: { apiName: 'tags', type: 'csv', maxItems: 20, itemMaxLength: 50 },
       draft: { apiName: 'draft', type: 'boolean' },
@@ -58,7 +75,8 @@ export const postCommands: CommandSpec[] = [
     pathParams: { 'post-id': { apiName: 'postId', format: 'object-id' } },
     requiredOptions: ['post-id'],
     body: {
-      content: { apiName: 'content', maxLength: 50_000 },
+      content: POST_CONTENT,
+      format: POST_FORMAT,
       category: { apiName: 'category', maxLength: 100 },
       tags: { apiName: 'tags', type: 'csv', maxItems: 20, itemMaxLength: 50 },
       draft: { apiName: 'draft', type: 'boolean' },
@@ -99,7 +117,7 @@ export const postCommands: CommandSpec[] = [
     pathParams: { 'post-id': { apiName: 'postId', format: 'object-id' } },
     requiredOptions: ['post-id', 'content'],
     body: {
-      content: { apiName: 'content', maxLength: 10_000 },
+      content: COMMENT_CONTENT,
     },
   },
   {
@@ -109,7 +127,7 @@ export const postCommands: CommandSpec[] = [
     pathParams: { 'comment-id': { apiName: 'commentId', format: 'object-id' } },
     requiredOptions: ['comment-id', 'content'],
     body: {
-      content: { apiName: 'content', maxLength: 10_000 },
+      content: COMMENT_CONTENT,
     },
   },
   {

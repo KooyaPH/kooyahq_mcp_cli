@@ -1,3 +1,4 @@
+import { aiNewsCommands } from './ai-news/specs.js';
 import { analyticsCommands } from './analytics/specs.js';
 import { announcementCommands } from './announcements/specs.js';
 import { authCommands } from './auth/specs.js';
@@ -33,6 +34,7 @@ export const commandCatalog: CommandSpec[] = [
   ...documentationCommands,
   ...kooyapediaCommands,
   ...postCommands,
+  ...aiNewsCommands,
   ...chatCommands,
   ...meetCommands,
 ];

@@ -27,6 +27,7 @@ const DOMAIN_WORKFLOWS: Record<string, string> = {
   documentation: 'List documentation, create a link or upload a file, then pin, update, or delete as permitted.',
   kooyapedia: 'Open home or search, then fetch a page slug when needed.',
   posts: 'List feed posts, create or update content, then manage comments, reactions, and poll votes.',
+  'ai-news': 'List AI News, or create and delete custom items; each custom item is also posted to the Feed.',
   chat: 'List conversations or contacts, send messages over HTTP, and poll unread counts; for live chat lines use events watch/poll.',
   meet: 'List contacts or create a room token, then manage recordings and egress when recording permission allows.',
 };

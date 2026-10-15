@@ -5,6 +5,7 @@ import { commandCatalog, commandNames } from '../src/commands/catalog.js';
 import { buildRequest } from '../src/commands/request.js';
 
 const EXPECTED_COMMANDS = [
+  'ai-news create', 'ai-news delete', 'ai-news list',
   'analytics costs', 'analytics costs budgets comparisons', 'analytics costs budgets create',
   'analytics costs budgets delete', 'analytics costs budgets list', 'analytics costs budgets update',
   'analytics costs compare', 'analytics costs forecast', 'analytics costs live',
@@ -944,6 +945,60 @@ test('requires confirmation for destructive bulk or delete operations', () => {
     buildRequest(commandCatalog, ['time', 'timers', 'stop-all', '--yes']).confirmation,
     undefined,
   );
+});
+
+test('maps post content format and keeps mention tokens verbatim', () => {
+  const content = 'Thanks @[Jane Doe](507f1f77bcf86cd799439015)';
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'posts', 'create', '--content', content, '--format', 'markdown',
+  ]).body, { content, format: 'markdown' });
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'posts', 'update', '--post-id', '507f1f77bcf86cd799439011', '--content', 'Hi', '--format', 'text',
+  ]).body, { content: 'Hi', format: 'text' });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['posts', 'create', '--content', 'Hi', '--format', 'html']),
+    /--format must be markdown or text/,
+  );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'posts', 'comments', 'create', '--post-id', '507f1f77bcf86cd799439011', '--content', content,
+  ]).body, { content });
+});
+
+test('maps AI News list, create, and delete to the CLI API', () => {
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'ai-news', 'list', '--filter', 'custom', '--limit', '20', '--offset', '0',
+  ]), {
+    method: 'GET',
+    path: '/ai-news',
+    query: { filter: 'custom', limit: 20, offset: 0 },
+    output: 'table',
+  });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['ai-news', 'list', '--filter', 'rss']),
+    /--filter must be/,
+  );
+  assert.deepEqual(buildRequest(commandCatalog, [
+    'ai-news', 'create', '--title', 'Launch', '--content', '**New** model',
+    '--url', 'https://example.com/post', '--image-url', 'https://example.com/a.png', '--author', 'Kooya',
+  ]).body, {
+    title: 'Launch',
+    content: '**New** model',
+    url: 'https://example.com/post',
+    imageUrl: 'https://example.com/a.png',
+    author: 'Kooya',
+  });
+  assert.throws(
+    () => buildRequest(commandCatalog, ['ai-news', 'create', '--title', 'Launch']),
+    /--content/,
+  );
+  assert.throws(
+    () => buildRequest(commandCatalog, ['ai-news', 'create', '--title', 'x'.repeat(301), '--content', 'Body']),
+    /--title/,
+  );
+  const deletion = buildRequest(commandCatalog, ['ai-news', 'delete', '--news-id', 'custom-1760500000000']);
+  assert.equal(deletion.method, 'DELETE');
+  assert.equal(deletion.path, '/ai-news/custom-1760500000000');
+  assert.equal(deletion.confirmation, 'Delete AI news custom-1760500000000? This also removes its Feed post.');
 });
 
 test('applies endpoint-specific sort allowlists and selector validation', () => {

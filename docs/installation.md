@@ -13,7 +13,7 @@ git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 hash -r
 kooyahq --version
 kooyahq-mcp --version
@@ -24,7 +24,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 hash -r
 kooyahq --version
 kooyahq-mcp --version
@@ -36,7 +36,7 @@ Install Node.js 18 or newer and Git for Windows. In PowerShell, run:
 
 ```powershell
 git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 kooyahq --version
 kooyahq-mcp --version
 ```
@@ -45,11 +45,13 @@ The package installs committed `dist/` JavaScript, so the target machine does no
 
 ## Update
 
-For a Git-based global upgrade, remove the current package before installing the new revision. This avoids npm's unreliable in-place replacement of a Git dependency:
+From 0.3.0 onward, run `kooyahq update --check` to look for a newer GitHub release and `kooyahq update` (or `kooyahq update --yes`) to install it; it runs the sequence below with the latest tag and refreshes an installed Codex `kooyahq-cli` skill. Version 0.2.0 users must reinstall once manually.
+
+For a manual Git-based global upgrade, remove the current package before installing the new revision. This avoids npm's unreliable in-place replacement of a Git dependency:
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 hash -r
 kooyahq --version
 ```

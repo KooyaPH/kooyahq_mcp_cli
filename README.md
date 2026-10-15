@@ -1,6 +1,6 @@
 # KooyaHQ CLI
 
-Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, events, announcements, presence locations, settings, documentation, KooyaPedia, posts, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
+Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, events, announcements, presence locations, settings, documentation, KooyaPedia, posts, AI News, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
 
 The package is not published to npmjs.com, and Node.js 18 or newer is required. Install the tagged GitHub release; backend authorization remains mandatory.
 
@@ -21,7 +21,7 @@ git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
 ## Linux
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 hash -r
 kooyahq --version
 kooyahq --help
@@ -33,7 +33,7 @@ kooyahq-mcp --version
 Install Node.js 18 or newer from nodejs.org or your approved package manager, then run:
 
 ```sh
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 hash -r
 kooyahq --version
 kooyahq --help
@@ -46,7 +46,7 @@ Install Node.js 18 or newer and Git for Windows, then run this in PowerShell:
 
 ```powershell
 git ls-remote https://github.com/KooyaPH/kooyahq_mcp_cli.git
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 kooyahq --version
 kooyahq --help
 kooyahq-mcp --version
@@ -56,11 +56,23 @@ The committed `dist/` directory is installed directly. TypeScript is not compile
 
 ## Update
 
-For a Git-based global upgrade, remove the current package before installing the new revision. This avoids npm's unreliable in-place replacement of a Git dependency:
+From 0.3.0 onward, update to the latest GitHub release with:
+
+```sh
+kooyahq update --check   # report whether a newer release exists
+kooyahq update           # confirm, then reinstall the latest release
+kooyahq update --yes     # reinstall without the confirmation prompt
+```
+
+`kooyahq update` reads the latest release tag from GitHub, and when it is newer than the installed version runs the manual upgrade sequence below with that tag. If the Codex `kooyahq-cli` skill is installed, it is refreshed too. There is no automatic background check.
+
+Version 0.2.0 has no `update` command, so 0.2.0 users must reinstall once manually with the commands below.
+
+For a manual Git-based global upgrade, remove the current package before installing the new revision. This avoids npm's unreliable in-place replacement of a Git dependency:
 
 ```sh
 npm uninstall -g kooyahq-cli
-npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.2.0
+npm install -g --install-links=true --ignore-scripts git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#v0.3.0
 hash -r
 kooyahq --version
 ```
@@ -573,6 +585,33 @@ posts reactions remove
 
 Create and update accept optional `--image` file paths. Delete is available on CLI/MCP and on the web API.
 
+`--format markdown|text` sets how `--content` is rendered: `markdown`, or plain `text` with line breaks kept. Without it the backend keeps its default behavior. Comments are always plain text.
+
+Mention users in post content and comments with the token `@[Name](userId)`. Get user IDs from `kooyahq users list`; unknown IDs are ignored. Mentioned users are notified.
+
+```sh
+kooyahq posts create --format markdown --content '**Shipped** the release, thanks @[Jane Doe](507f1f77bcf86cd799439015)'
+kooyahq posts comments create --post-id 507f1f77bcf86cd799439011 --content 'Nice work @[Jane Doe](507f1f77bcf86cd799439015)'
+```
+
+### AI News
+
+```text
+ai-news list
+ai-news create
+ai-news delete
+```
+
+- `ai-news list` accepts `--filter` (`all`, `news`, `custom`, or an RSS source such as `openai`, `techcrunch`, `hackernews`), `--limit` (up to 100), and `--offset`. Use `--filter custom` for items posted through KooyaHQ.
+- `ai-news create` requires `--title` (max 300 characters) and `--content` (markdown, max 20,000 characters). Optional: `--url` and `--image-url` (HTTPS), and `--author`. Creating an item also posts it to the Feed as you.
+- `ai-news delete --news-id <id>` removes a custom item and its Feed post. IDs look like `custom-...`, not ObjectIds. Linked Feed posts are managed through AI News, not `posts update` or `posts delete`.
+
+```sh
+kooyahq ai-news list --filter custom --limit 20 --output json
+kooyahq ai-news create --title 'New model release' --content '**Highlights**: faster and cheaper.' --url https://example.com/post
+kooyahq ai-news delete --news-id custom-1760500000000
+```
+
 ### Chat
 
 ```text
@@ -716,9 +755,17 @@ Revoke a compromised key in the user's KooyaHQ profile, remove it from CI/enviro
 npm ci
 npm test
 npm run typecheck
-npm run build
-node scripts/verify-dist.mjs
 npm audit --omit=dev
 ```
 
-Required CI verifies Node.js 18, 20, 22, and 24 on Linux, checks that committed `dist/` matches the TypeScript source, packs and installs the artifact, and performs a local Git global installation into an isolated prefix. Hosted Ubuntu, macOS, and Windows smoke jobs are defined in the workflow and run when the repository variable `KOOYAHQ_CLI_ENABLE_HOSTED_SMOKE` is set to `true`; keep them optional when the GitHub organization has no hosted-runner capacity. The repository has no npm publication or deployment workflow.
+Pull requests do not need to commit a regenerated `dist/`. Required CI verifies Node.js 18, 20, 22, and 24 on Linux, builds `dist/` from source, smoke-tests the MCP handshake, packs and installs the built artifact, and performs a local Git global installation into an isolated prefix. Hosted Ubuntu, macOS, and Windows smoke jobs are defined in the workflow and run when the repository variable `KOOYAHQ_CLI_ENABLE_HOSTED_SMOKE` is set to `true`; keep them optional when the GitHub organization has no hosted-runner capacity. The repository has no npm publication workflow.
+
+### Release flow
+
+After the required checks pass on a push to `main`, the `auto_release` job on a GitHub-hosted `ubuntu-latest` runner:
+
+1. Builds `dist/` and, if it changed, commits it back to `main` as `github-actions[bot]` with `chore: regenerate dist [skip ci]`.
+2. Verifies the committed `dist/` (`node scripts/verify-dist.mjs`) and smoke-tests a Git global installation of that exact commit.
+3. Reads `version` from `package.json`. If tag `vX.Y.Z` does not exist yet, it tags the release commit and publishes a GitHub release with generated notes; otherwise it skips the release.
+
+To release, bump `version` in `package.json`, `package-lock.json`, and `skills/kooyahq-cli/VERSION`, and update the install tags in this README and `docs/`, in the pull request. Merging it publishes the release, and `kooyahq update` picks it up. Commits pushed with the workflow token do not start new workflow runs, so the dist commit cannot loop.

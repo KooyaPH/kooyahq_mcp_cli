@@ -44,6 +44,12 @@ For live HQ signals (notifications, chat, tickets), MCP hosts must use `events c
 
 After the company-internal project gate passes, discover the board first, keep its exact ID or key, then discover the ticket command. For moves and reorders, use the semantic placement returned by discovery: `before`, `after`, `first`, or `last`. Read the ticket and destination board before moving, then read them again afterward. Do not edit MongoDB or another datastore directly; all changes must pass through the KooyaHQ CLI API.
 
+## Feed posts and AI News
+
+`posts create` and `posts update` accept `--format markdown|text` for `--content`. Comments are plain text only. To mention someone in a post or comment, write `@[Name](userId)` with an exact ID from `kooyahq users list --output json`; never guess an ID.
+
+`ai-news list --filter custom` lists items posted through KooyaHQ. `ai-news create` takes `--title` and markdown `--content` (both required), plus optional `--url`, `--image-url`, and `--author`. It also posts the item to the Feed, so do not create a separate post for it. `ai-news delete --news-id custom-...` removes the item and its Feed post; do not edit or delete that post through `posts`.
+
 ## Timers
 
 List projects and active timers before starting or changing work:
