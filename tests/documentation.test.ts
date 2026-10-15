@@ -266,6 +266,20 @@ test('subtask parent dependency is machine-readable and visible in help', () => 
   assert.match(helpText(['tickets', 'create']), /When --ticket-type is subtask.*exactly one.*--parent-ticket-id.*--parent-ticket-key/i);
 });
 
+test('post help and skills document the format option and mention token', () => {
+  const document = JSON.parse(skillOutput(['posts', 'create', '--output', 'json'])) as {
+    parameters: Array<{ name: string; description?: string; choices?: string[] }>;
+  };
+  const content = document.parameters.find((parameter) => parameter.name === 'content');
+  assert.match(content?.description ?? '', /@\[Name\]\(userId\).*users list/);
+  assert.deepEqual(
+    document.parameters.find((parameter) => parameter.name === 'format')?.choices,
+    ['markdown', 'text'],
+  );
+  assert.match(helpText(['posts', 'comments', 'create']), /Plain-text comment\. Mention users with @\[Name\]\(userId\)/);
+  assert.match(helpText(['ai-news', 'create']), /also posted to the Feed/);
+});
+
 test('rejects repeated skill output options', () => {
   assert.throws(
     () => skillOutput(['tickets', 'create', '--output', 'json', '--output=json']),

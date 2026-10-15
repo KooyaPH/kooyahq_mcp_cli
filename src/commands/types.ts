@@ -12,6 +12,7 @@ export type ValueType =
 
 export interface OptionSpec {
   apiName: string;
+  description?: string;
   type?: ValueType;
   choices?: string[];
   itemChoices?: string[];

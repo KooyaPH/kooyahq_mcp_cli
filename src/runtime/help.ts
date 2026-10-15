@@ -185,7 +185,7 @@ function formatOption(
   const value = optionValueLabel(definition);
   const requirement = required ? 'required' : oneOf ? 'required group' : '';
   const details = [requirement, ...optionConstraints(definition)].filter(Boolean);
-  return `  --${name}${value ? ` ${value}` : ''}  ${optionDescription(name, 'body')}${details.length > 0 ? ` (${details.join('; ')})` : ''}`;
+  return `  --${name}${value ? ` ${value}` : ''}  ${definition.description ?? optionDescription(name, 'body')}${details.length > 0 ? ` (${details.join('; ')})` : ''}`;
 }
 
 function flag(value: string): string {

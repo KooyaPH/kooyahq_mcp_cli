@@ -1,6 +1,6 @@
 # KooyaHQ CLI
 
-Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, events, announcements, presence locations, settings, documentation, KooyaPedia, posts, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
+Authenticated command-line access to KooyaHQ projects, boards, tickets, time tracking, analytics, users, notifications, events, announcements, presence locations, settings, documentation, KooyaPedia, posts, AI News, chat, and meet. The source is public for controlled internal distribution; KooyaHQ access still requires an authorized account and CLI key. The default backend origin is `https://hq-be.kooyaai.com`; API requests use `/api/cli/v1`.
 
 The package is not published to npmjs.com, and Node.js 18 or newer is required. Install the tagged GitHub release; backend authorization remains mandatory.
 
@@ -572,6 +572,33 @@ posts reactions remove
 ```
 
 Create and update accept optional `--image` file paths. Delete is available on CLI/MCP and on the web API.
+
+`--format markdown|text` sets how `--content` is rendered: `markdown`, or plain `text` with line breaks kept. Without it the backend keeps its default behavior. Comments are always plain text.
+
+Mention users in post content and comments with the token `@[Name](userId)`. Get user IDs from `kooyahq users list`; unknown IDs are ignored. Mentioned users are notified.
+
+```sh
+kooyahq posts create --format markdown --content '**Shipped** the release, thanks @[Jane Doe](507f1f77bcf86cd799439015)'
+kooyahq posts comments create --post-id 507f1f77bcf86cd799439011 --content 'Nice work @[Jane Doe](507f1f77bcf86cd799439015)'
+```
+
+### AI News
+
+```text
+ai-news list
+ai-news create
+ai-news delete
+```
+
+- `ai-news list` accepts `--filter` (`all`, `news`, `custom`, or an RSS source such as `openai`, `techcrunch`, `hackernews`), `--limit` (up to 100), and `--offset`. Use `--filter custom` for items posted through KooyaHQ.
+- `ai-news create` requires `--title` (max 300 characters) and `--content` (markdown, max 20,000 characters). Optional: `--url` and `--image-url` (HTTPS), and `--author`. Creating an item also posts it to the Feed as you.
+- `ai-news delete --news-id <id>` removes a custom item and its Feed post. IDs look like `custom-...`, not ObjectIds. Linked Feed posts are managed through AI News, not `posts update` or `posts delete`.
+
+```sh
+kooyahq ai-news list --filter custom --limit 20 --output json
+kooyahq ai-news create --title 'New model release' --content '**Highlights**: faster and cheaper.' --url https://example.com/post
+kooyahq ai-news delete --news-id custom-1760500000000
+```
 
 ### Chat
 
