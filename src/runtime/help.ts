@@ -14,6 +14,7 @@ export function helpText(scope: string[] = []): string {
   const configuration = configureHelpText(scope);
   if (configuration) return configuration;
   if (scope[0] === 'mcp') return mcpHelpText();
+  if (scope[0] === 'update') return updateHelpText();
   if (scope.length > 0) {
     const name = scope.join(' ');
     const command = commandCatalog.find((candidate) => candidate.name === name);
@@ -44,6 +45,7 @@ Usage:
   kooyahq mcp install --client <codex|cursor|claude|gemini|antigravity>
   kooyahq mcp doctor --client <codex|cursor|claude|gemini|antigravity> [--online]
   kooyahq mcp manual --client <openclaw|hermes>
+  kooyahq update [--check] [--yes]
   kooyahq <command> [arguments] [options]
   kooyahq --skill [group] [command] [--output markdown|json]
 
@@ -87,6 +89,22 @@ Doctor checks the package, client registration, and local MCP handshake; Codex a
 Use manual for OpenClaw or Hermes to print their client-specific local stdio registration values without modifying client configuration.
 Run the command from the operating system that owns the client: a Windows Cursor desktop uses Windows paths, while WSL configures WSL-local clients.
 Use --online to also validate the configured KooyaHQ profile.`;
+}
+
+function updateHelpText(): string {
+  return `KooyaHQ CLI update
+
+Usage:
+  kooyahq update [--check] [--yes]
+
+Options:
+  --check  Report whether a newer GitHub release exists without installing it.
+  --yes    Skip the confirmation prompt.
+
+Behavior:
+  Reads the latest release tag from GitHub. When it is newer than the installed version, runs
+  npm uninstall -g kooyahq-cli, then npm install -g --install-links=true --ignore-scripts
+  git+https://github.com/KooyaPH/kooyahq_mcp_cli.git#<tag>. An installed Codex kooyahq-cli skill is refreshed.`;
 }
 
 function commandHelp(command: CommandSpec): string {

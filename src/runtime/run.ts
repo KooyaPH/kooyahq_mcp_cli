@@ -17,6 +17,7 @@ import { runMcpSetupCommand, type SetupOverrides } from '../mcp/setup/index.js';
 import { formatOutput } from '../output/format.js';
 import { helpText } from './help.js';
 import { skillOutput } from './skill.js';
+import { runUpdate, type UpdateOverrides } from './update.js';
 
 export interface RuntimeDependencies {
   environment: NodeJS.ProcessEnv;
@@ -30,6 +31,7 @@ export interface RuntimeDependencies {
   readStandardInput: (maxBytes: number) => Promise<Uint8Array>;
   allPagesLimits?: AllPagesLimits;
   mcpSetup?: SetupOverrides;
+  update?: UpdateOverrides;
   output: {
     stdout: (value: string) => void;
     stderr: (value: string) => void;
@@ -85,6 +87,12 @@ export async function runCli(argv: string[], dependencies: RuntimeDependencies):
     }
     if (argv[0] === 'configure') return await runConfigure(argv.slice(1), dependencies);
     if (argv[0] === 'mcp') return await runMcpSetup(argv.slice(1), dependencies);
+    if (argv[0] === 'update') {
+      return await runUpdate(argv.slice(1), {
+        ...dependencies,
+        ...(dependencies.update ? { overrides: dependencies.update } : {}),
+      });
+    }
 
     const request = buildRequest(commandCatalog, argv);
     await materializeFileInput(request, dependencies);
