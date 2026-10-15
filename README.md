@@ -762,7 +762,7 @@ Pull requests do not need to commit a regenerated `dist/`. Required CI verifies 
 
 ### Release flow
 
-After the required checks pass on a push to `main`, the `auto_release` job on the self-hosted runner:
+After the required checks pass on a push to `main`, the `auto_release` job on a GitHub-hosted `ubuntu-latest` runner:
 
 1. Builds `dist/` and, if it changed, commits it back to `main` as `github-actions[bot]` with `chore: regenerate dist [skip ci]`.
 2. Verifies the committed `dist/` (`node scripts/verify-dist.mjs`) and smoke-tests a Git global installation of that exact commit.

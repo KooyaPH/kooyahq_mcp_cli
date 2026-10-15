@@ -15,9 +15,7 @@ concurrency:
 jobs:
   verify:
     name: Linux / Node ${{ matrix.node }}
-    # Fork pull requests must never execute on Kooya's trusted runner.
-    # Maintainer pushes and release tags retain the internal self-hosted path.
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -117,7 +115,7 @@ jobs:
 
   required:
     name: Required checks
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
+    runs-on: ubuntu-latest
     needs: [verify, cross-platform-smoke]
     if: ${{ always() }}
     steps:
@@ -138,7 +136,7 @@ jobs:
     needs: [required]
     # GITHUB_TOKEN pushes never start workflows; the actor check and [skip ci] are extra loop guards.
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]' }}
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
